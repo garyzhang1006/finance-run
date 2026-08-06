@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FINANCE RUN</title>
+<style>
+/* ============ design tokens ============ */
+:root{
+  --ink-950:#0b0e12;
+  --ink-900:#11151c;
+  --ink-800:#1a2029;
+  --ink-700:#252d39;
+  --ink-600:#37404f;
+  --paper:#f2f0e9;
+  --acid:#c8f542;
+  --hot:#ff5d8f;
+  --sky:#5dc9ff;
+  --gold:#ffd23f;
+  --danger:#ff4d4d;
+  --txt:#eef1f4;
+  --txt-dim:#9aa5b1;
+
+  --font-display:"Arial Black","Archivo Black",Impact,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --font-body:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --r-1:6px;
+  --bd:2px solid var(--ink-600);
+  --t-fast:150ms; --t-med:240ms;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--ink-950);
+  color:var(--txt);
+  font-family:var(--font-body);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+/* faint grain so flats don't look sterile */
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.05;z-index:99;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
+}
+button{font-family:inherit;cursor:pointer;touch-action:manipulation}
+button:focus-visible,a:focus-visible{outline:3px solid var(--sky);outline-offset:2px}
+
+.screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:var(--sp-5)}
+.screen.on{display:flex}
+
+/* ============ title screen ============ */
+.ticker{
+  position:fixed;top:0;left:0;right:0;height:34px;display:flex;align-items:center;overflow:hidden;
+  background:var(--acid);color:var(--ink-950);border-bottom:3px solid var(--ink-950);
+  font-family:var(--font-mono);font-size:13px;font-weight:700;letter-spacing:.06em;white-space:nowrap;
+}
+.ticker span{padding-left:100%;display:inline-block;animation:tick 26s linear infinite}
+@keyframes tick{to{transform:translateX(-100%)}}
+@media (prefers-reduced-motion:reduce){.ticker span{animation:none;padding-left:var(--sp-4)}}
+
+.logo-wrap{text-align:center;max-width:640px}
+.kicker{
+  display:inline-block;font-family:var(--font-mono);font-size:12px;letter-spacing:.28em;
+  color:var(--ink-950);background:var(--hot);padding:5px 12px;transform:rotate(-2deg);
+  border:2px solid var(--ink-950);box-shadow:3px 3px 0 rgba(0,0,0,.5);margin-bottom:var(--sp-5);
+  text-transform:uppercase;font-weight:700;
+}
+h1.logo{
+  font-family:var(--font-display);
+  font-size:clamp(52px,13vw,118px);
+  line-height:.88;letter-spacing:-.02em;text-transform:uppercase;
+  color:var(--acid);
+  text-shadow:5px 5px 0 var(--hot), 10px 10px 0 rgba(0,0,0,.6);
+}
+h1.logo .alt{color:var(--paper);display:block}
+.tagline{
+  margin-top:var(--sp-5);color:var(--txt-dim);font-size:clamp(15px,2.4vw,18px);line-height:1.55;max-width:46ch;
+  margin-left:auto;margin-right:auto;
+}
+.tagline b{color:var(--txt)}
+
+.btn{
+  border:3px solid var(--ink-950);font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  transition:transform var(--t-fast) ease-out, box-shadow var(--t-fast) ease-out;
+  min-height:48px;
+}
+.btn-primary{
+  background:var(--acid);color:var(--ink-950);font-size:clamp(17px,2.6vw,21px);
+  padding:14px 44px;box-shadow:6px 6px 0 var(--hot);margin-top:var(--sp-6);
+  font-family:var(--font-display);
+}
+.btn-primary:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 var(--hot)}
+.btn-primary:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--hot)}
+.howto{
+  margin-top:var(--sp-6);display:flex;gap:var(--sp-4);flex-wrap:wrap;justify-content:center;
+  font-family:var(--font-mono);font-size:13px;color:var(--txt-dim);
+}
+.howto .chip{display:flex;align-items:center;gap:8px;border:var(--bd);padding:8px 14px;border-radius:var(--r-1);background:var(--ink-900)}
+.howto svg{width:16px;height:16px;stroke:var(--acid);flex:none}
+.hiscore{margin-top:var(--sp-5);font-family:var(--font-mono);font-size:13px;color:var(--gold);letter-spacing:.08em}
+
+/* ============ game screen ============ */
+#screen-game{padding:0;justify-content:flex-start}
+.hud{
+  width:100%;display:flex;align-items:stretch;gap:var(--sp-2);padding:var(--sp-3);
+  background:var(--ink-900);border-bottom:3px solid var(--ink-950);
+}
+.stat{
+  flex:1;min-width:0;border:var(--bd);background:var(--ink-800);border-radius:var(--r-1);
+  padding:8px 12px;display:flex;flex-direction:column;gap:2px;
+}
+.stat .lbl{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:10px;letter-spacing:.18em;color:var(--txt-dim);text-transform:uppercase}
+.stat .lbl svg{width:13px;height:13px;flex:none}
+.stat .val{font-family:var(--font-mono);font-weight:700;font-size:clamp(15px,2.6vw,21px);font-variant-numeric:tabular-nums;color:var(--txt)}
+.stat.cash .val{color:var(--acid)}
+.stat.cash.neg .val{color:var(--danger)}
+.stat.credit .val{color:var(--sky)}
+.stat.vibes .val{color:var(--hot)}
+.stat .bar{height:5px;background:var(--ink-950);border-radius:3px;overflow:hidden;margin-top:4px}
+.stat .bar i{display:block;height:100%;background:var(--hot);width:50%;transition:width var(--t-med) ease-out}
+.month-pill{
+  align-self:center;flex:none;font-family:var(--font-display);font-size:clamp(14px,2.4vw,20px);
+  background:var(--paper);color:var(--ink-950);border:3px solid var(--ink-950);
+  padding:8px 14px;transform:rotate(1.5deg);box-shadow:3px 3px 0 rgba(0,0,0,.5);white-space:nowrap;
+}
+#stage-wrap{position:relative;flex:1;width:100%;overflow:hidden}
+canvas{display:block;width:100%;height:100%;background:var(--ink-950)}
+.toast{
+  position:absolute;left:50%;top:14%;transform:translateX(-50%);
+  font-family:var(--font-mono);font-weight:700;font-size:15px;letter-spacing:.05em;
+  background:var(--ink-950);border:2px solid var(--acid);color:var(--acid);
+  padding:8px 16px;border-radius:var(--r-1);opacity:0;pointer-events:none;white-space:nowrap;
+  transition:opacity var(--t-med), transform var(--t-med);
+}
+.toast.bad{border-color:var(--danger);color:var(--danger)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+
+/* decision card */
+.overlay{
+  position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(6,8,11,.72);backdrop-filter:blur(3px);padding:var(--sp-4);z-index:5;
+}
+.overlay.on{display:flex}
+.card{
+  width:min(560px,100%);background:var(--paper);color:var(--ink-950);
+  border:3px solid var(--ink-950);box-shadow:8px 8px 0 var(--acid);
+  padding:var(--sp-5);border-radius:var(--r-1);
+  animation:cardin var(--t-med) ease-out;
+  max-height:100%;overflow-y:auto;
+}
+@keyframes cardin{from{transform:translateY(16px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.card{animation:none}}
+.card .tag{
+  display:inline-block;font-family:var(--font-mono);font-size:11px;font-weight:700;letter-spacing:.2em;
+  text-transform:uppercase;background:var(--ink-950);color:var(--acid);padding:4px 10px;margin-bottom:var(--sp-3);
+}
+.card h2{font-family:var(--font-display);font-size:clamp(20px,4vw,27px);line-height:1.08;text-transform:uppercase;margin-bottom:var(--sp-3)}
+.card p.body{font-size:15px;line-height:1.55;color:#3a4149;margin-bottom:var(--sp-4)}
+.choices{display:flex;flex-direction:column;gap:var(--sp-2)}
+.choice{
+  text-align:left;background:#fff;border:2px solid var(--ink-950);border-radius:var(--r-1);
+  padding:12px 14px;font-size:14.5px;line-height:1.4;display:flex;gap:10px;align-items:flex-start;
+  transition:transform var(--t-fast), box-shadow var(--t-fast), background var(--t-fast);
+  box-shadow:3px 3px 0 rgba(0,0,0,.25);color:var(--ink-950);
+}
+.choice:hover:not(:disabled){background:var(--acid);transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(0,0,0,.35)}
+.choice:active:not(:disabled){transform:translate(2px,2px);box-shadow:1px 1px 0 rgba(0,0,0,.35)}
+.choice:disabled{cursor:default}
+.choice.picked{background:var(--acid)}
+.choice.faded{opacity:.35}
+.choice .key{
+  flex:none;font-family:var(--font-mono);font-weight:700;font-size:12px;border:2px solid var(--ink-950);
+  width:24px;height:24px;display:grid;place-items:center;border-radius:4px;background:var(--paper);margin-top:1px;
+}
+.lesson{
+  border-top:2px dashed var(--ink-950);margin-top:var(--sp-4);padding-top:var(--sp-4);display:none;
+}
+.lesson.on{display:block}
+.lesson .delta{font-family:var(--font-mono);font-weight:700;font-size:14px;margin-bottom:var(--sp-2);display:flex;gap:14px;flex-wrap:wrap}
+.lesson .delta .up{color:#2e7d1f}.lesson .delta .down{color:#c62828}
+.lesson p{font-size:14.5px;line-height:1.55;color:#3a4149}
+.lesson p strong{color:var(--ink-950)}
+.btn-continue{
+  margin-top:var(--sp-4);width:100%;background:var(--ink-950);color:var(--acid);
+  font-family:var(--font-display);font-size:16px;padding:12px;border-radius:var(--r-1);
+  box-shadow:4px 4px 0 var(--hot);border:3px solid var(--ink-950);
+}
+.btn-continue:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--hot)}
+
+/* pause hint */
+.pausehint{
+  position:absolute;bottom:10px;right:12px;font-family:var(--font-mono);font-size:11px;
+  color:var(--txt-dim);letter-spacing:.08em;background:rgba(11,14,18,.7);padding:4px 8px;border-radius:4px;
+}
+
+/* ============ end screen ============ */
+.receipt{
+  width:min(430px,94vw);background:var(--paper);color:var(--ink-950);
+  font-family:var(--font-mono);border:3px solid var(--ink-950);
+  box-shadow:10px 10px 0 var(--hot);
+  padding:var(--sp-5);
+  max-height:78vh;overflow-y:auto;
+}
+.receipt h2{font-family:var(--font-display);font-size:24px;text-align:center;letter-spacing:.02em;text-transform:uppercase}
+.receipt .sub{text-align:center;font-size:11px;letter-spacing:.22em;margin:4px 0 var(--sp-4);color:#555}
+.rline{display:flex;justify-content:space-between;font-size:13.5px;padding:5px 0;font-variant-numeric:tabular-nums}
+.rline.total{border-top:2px dashed var(--ink-950);border-bottom:2px dashed var(--ink-950);margin-top:var(--sp-2);padding:9px 0;font-weight:700;font-size:15px}
+.grade-row{display:flex;align-items:center;justify-content:center;gap:var(--sp-4);margin:var(--sp-4) 0}
+.grade{
+  font-family:var(--font-display);font-size:64px;line-height:1;color:var(--ink-950);
+  background:var(--acid);border:3px solid var(--ink-950);padding:6px 22px;transform:rotate(-3deg);
+  box-shadow:5px 5px 0 var(--ink-950);
+}
+.grade-note{font-size:12.5px;line-height:1.5;max-width:20ch}
+.rlessons-hd{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#555}
+.rlessons{margin:var(--sp-3) 0;font-size:12.5px;line-height:1.6;list-style:square}
+.rlessons li{margin-left:18px;margin-bottom:6px}
+.barcode{margin:var(--sp-4) auto 4px;height:38px;width:82%;
+  background:repeating-linear-gradient(90deg,var(--ink-950) 0 2px,transparent 2px 5px,var(--ink-950) 5px 6px,transparent 6px 10px)}
+.receipt .foot{text-align:center;font-size:10px;letter-spacing:.18em;color:#666;margin-top:6px}
+.end-actions{display:flex;gap:var(--sp-3);margin-top:var(--sp-5)}
+.btn-ghost{
+  background:var(--ink-800);color:var(--txt);font-size:14px;padding:12px 22px;border-radius:var(--r-1);
+  box-shadow:4px 4px 0 rgba(0,0,0,.5);font-family:var(--font-mono);font-weight:700;
+}
+</style>
+</head>
+<body>
+
+<!-- ============ TITLE ============ -->
+<div class="screen on" id="screen-title">
+  <div class="ticker" aria-hidden="true"><span>
+    RENT IS DUE &nbsp;✦&nbsp; YOUR BAG WON'T SECURE ITSELF &nbsp;✦&nbsp; CREDIT SCORE IS A VIBE CHECK FROM BANKS &nbsp;✦&nbsp; COMPOUND INTEREST &gt; LOTTERY &nbsp;✦&nbsp; SCAM DMs AHEAD &nbsp;✦&nbsp; PAY YOURSELF FIRST &nbsp;✦&nbsp; RENT IS DUE &nbsp;✦&nbsp; YOUR BAG WON'T SECURE ITSELF &nbsp;✦&nbsp; CREDIT SCORE IS A VIBE CHECK FROM BANKS &nbsp;✦&nbsp; COMPOUND INTEREST &gt; LOTTERY &nbsp;✦&nbsp; SCAM DMs AHEAD &nbsp;✦&nbsp; PAY YOURSELF FIRST
+  </span></div>
+  <div class="logo-wrap">
+    <span class="kicker">12 months · 1 paycheck at a time</span>
+    <h1 class="logo">Finance<span class="alt">Run</span></h1>
+    <p class="tagline">You just got your first job. <b>Dodge the money traps, stack your bag,</b> and survive a full year without your account going red. Every payday, real choices. Every choice, receipts.</p>
+    <button class="btn btn-primary" id="btn-start">Run it</button>
+    <div class="howto">
+      <span class="chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        arrows / W-S — switch lanes
+      </span>
+      <span class="chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+        tap top / bottom on phone
+      </span>
+      <span class="chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        P — pause
+      </span>
+    </div>
+    <div class="hiscore" id="hiscore"></div>
+  </div>
+</div>
+
+<!-- ============ GAME ============ -->
+<div class="screen" id="screen-game">
+  <div class="hud">
+    <div class="stat cash" id="stat-cash">
+      <span class="lbl">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 2v20M17 6.5C17 4.6 14.8 4 12 4s-5 .9-5 2.8c0 4.4 10 2 10 6.9 0 1.9-2.2 3.3-5 3.3s-5-1-5-2.9"/></svg>
+        Cash
+      </span>
+      <span class="val" id="v-cash">$0</span>
+    </div>
+    <div class="stat credit" id="stat-credit">
+      <span class="lbl">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        Credit
+      </span>
+      <span class="val" id="v-credit">650</span>
+    </div>
+    <div class="stat vibes" id="stat-vibes">
+      <span class="lbl">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 8.6a5.5 5.5 0 0 0-9.8-3.4A5.5 5.5 0 0 0 3.2 12c0 5 7.8 9 8.8 9s8.8-4 8.8-9z"/></svg>
+        Vibes
+      </span>
+      <span class="val" id="v-vibes">70</span>
+      <span class="bar"><i id="bar-vibes"></i></span>
+    </div>
+    <div class="month-pill" id="month-pill">JAN</div>
+  </div>
+  <div id="stage-wrap">
+    <canvas id="stage"></canvas>
+    <div class="toast" id="toast"></div>
+    <div class="pausehint">P = pause</div>
+
+    <div class="overlay" id="overlay">
+      <div class="card" role="dialog" aria-modal="true" aria-labelledby="card-title">
+        <span class="tag" id="card-tag">Payday · decision time</span>
+        <h2 id="card-title"></h2>
+        <p class="body" id="card-body"></p>
+        <div class="choices" id="card-choices"></div>
+        <div class="lesson" id="card-lesson">
+          <div class="delta" id="lesson-delta"></div>
+          <p id="lesson-text"></p>
+          <button class="btn btn-continue" id="btn-continue">Keep running →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ END ============ -->
+<div class="screen" id="screen-end">
+  <div class="receipt" id="receipt">
+    <h2 id="end-title">Year One: Wrapped</h2>
+    <p class="sub" id="end-sub">FINANCE RUN · OFFICIAL RECEIPT</p>
+    <div id="end-lines"></div>
+    <div class="rline total"><span>NET WORTH</span><span id="end-networth">$0</span></div>
+    <div class="grade-row">
+      <div class="grade" id="end-grade">B</div>
+      <div class="grade-note" id="end-gradenote"></div>
+    </div>
+    <div class="rlessons-hd">Receipts you collected</div>
+    <ul class="rlessons" id="end-lessons"></ul>
+    <div class="barcode" aria-hidden="true"></div>
+    <p class="foot">THANK YOU FOR RUNNING · NO REFUNDS ON BAD CHOICES</p>
+  </div>
+  <div class="end-actions">
+    <button class="btn btn-primary" id="btn-again" style="margin-top:0">Run it back</button>
+    <button class="btn btn-ghost" id="btn-menu">Menu</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =================================================================
+   FINANCE RUN — lane runner + payday decisions
+   All DOM writes use textContent / createElement (no innerHTML).
+   ================================================================= */
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const fmt$ = n => (n<0?"-$":"$")+Math.abs(Math.round(n)).toLocaleString("en-US");
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* build "text with *emphasis*" safely: *word* becomes <strong> */
+function setRich(el,str){
+  el.replaceChildren();
+  str.split("*").forEach((part,i)=>{
+    if(!part)return;
+    if(i%2){const s=document.createElement("strong");s.textContent=part;el.appendChild(s);}
+    else el.appendChild(document.createTextNode(part));
+  });
+}
+function el(tag,cls,txt){
+  const n=document.createElement(tag);
+  if(cls)n.className=cls;
+  if(txt!=null)n.textContent=txt;
+  return n;
+}
+
+const MONTHS=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const SALARY=1450;          // monthly take-home
+const RENT=700;             // auto-charged at payday
+const MONTH_DIST=2600;      // px of road per month
+
+/* ---------- payday decision deck (the curriculum) ----------
+   effects: cash, invest, debt, credit, vibes, salary (permanent/mo),
+   recur (permanent monthly cash delta), auto (monthly auto-invest) */
+const DECK=[
+ {t:"First paycheck just hit",
+  b:"$1,450 lands after rent. Group chat is planning a weekend trip that costs $400. What's the move?",
+  c:[
+   {l:"Go, you only live once. Book it.",e:{cash:-400,vibes:12},
+    x:"Fun counts, but that was over half your free cash on day one. The *50/30/20 rule* caps 'wants' at ~30% so one weekend can't wreck the month."},
+   {l:"Skip it, save every dollar.",e:{vibes:-10},
+    x:"Cheapest option, but all-restriction budgets snap like crash diets. Sustainable plans *budget fun on purpose* so you don't binge-spend later."},
+   {l:"Go for one night only, cap it at $150.",e:{cash:-150,vibes:7},
+    x:"That's budgeting: not 'no', just '*how much*'. You kept the friends and 90% of the paycheck."}]},
+ {t:"The credit card offer",
+  b:"A shiny card offers a $200 signup bonus at 27% APR. Your first credit product. Do you take it?",
+  c:[
+   {l:"Take it, pay the FULL balance monthly.",e:{cash:200,credit:25},
+    x:"Used this way a card is free credit history. *Pay in full and the 27% APR never touches you* while your score grows."},
+   {l:"Take it, pay the minimum, enjoy the float.",e:{cash:200,credit:-20,vibes:3,debt:400},
+    x:"Minimum payments are the trap. At 27% APR a balance paid at minimums costs *hundreds in interest* and drags on for years."},
+   {l:"Nope. Cards are evil. Cash only forever.",e:{credit:-10},
+    x:"Avoiding credit entirely means *no credit history* — which later means worse rates on apartments, cars, everything. Credit is a tool, not a sin."}]},
+ {t:"Sneaker drop: limited run",
+  b:"Resale hype says they'll double. They cost $310. Your gut says buy now, think later.",
+  c:[
+   {l:"Cop them as an 'investment'.",e:{cash:-310,vibes:6},
+    x:"Hype resale is *speculation, not investing*. No cash flow, no fundamentals — just hoping someone pays more later. Fine as a hobby, not a plan."},
+   {l:"Sleep on it for 48 hours.",e:{vibes:2},
+    x:"The *48-hour rule* kills most impulse buys. If you still want it in two days AND it fits the budget, fine. Usually the urge dies first."},
+   {l:"Put $310 into an index fund instead.",e:{cash:-310,invest:310},
+    x:"Boring wins. A broad index fund is *hundreds of companies at once* — historically ~7-10%/yr average. No drop-day stress."}]},
+ {t:"Sketchy DM: 'crypto flip, 10x guaranteed'",
+  b:"An 'investor' DMs you: send $500, get $5,000 back in a week. He has screenshots. Very shiny screenshots.",
+  c:[
+   {l:"Send $250 to test it out.",e:{cash:-250,vibes:-8},
+    x:"That's an advance-fee scam. *'Guaranteed returns' do not exist* — screenshots are free to fake. Test amounts vanish exactly as fast as big ones."},
+   {l:"Block, report, warn the group chat.",e:{vibes:4},
+    x:"Correct. Real investing is boring and never slides into your DMs. *If returns are 'guaranteed', it's a scam. Every time.*"},
+   {l:"Ask him for proof of past trades first.",e:{cash:-100,vibes:-4},
+    x:"Engaging keeps you on the hook — scammers escalate with fake 'proof' until you send something. *Don't negotiate with scams, block them.*"}]},
+ {t:"Emergency: phone screen shattered",
+  b:"Repair is $220. You need the phone for work. How do you cover a surprise expense?",
+  c:[
+   {l:"Emergency fund. That's what it's for.",e:{cash:-220},
+    x:"This is the whole pitch for an emergency fund: *3-6 months of expenses* parked in savings turns a crisis into an inconvenience."},
+   {l:"Buy-now-pay-later, 4 easy payments.",e:{cash:-55,debt:165,vibes:-2,credit:-8},
+    x:"BNPL feels free but it's still debt — miss one installment and fees plus credit damage stack up. *4 payments of $55 is still $220*, now with risk attached."},
+   {l:"Ignore it, tape over the crack.",e:{vibes:-9},
+    x:"Deferring essentials usually costs more later (dead phone = missed shifts). *Some spending is protection, not waste.*"}]},
+ {t:"Raise negotiation",
+  b:"Six months in, you're crushing it. A coworker doing the same job earns $150/mo more. Do you ask?",
+  c:[
+   {l:"Ask, with receipts of your wins.",e:{salary:150,vibes:6},
+    x:"The biggest lever in personal finance is *income, not coupons*. A 10% raise beats a year of skipped lattes. Evidence plus a calm ask gives the best odds."},
+   {l:"Too awkward. Stay quiet.",e:{vibes:-5},
+    x:"Silence has a price: raises compound like interest. Skipping one *$150/mo bump costs $1,800 a year — every year after, too.*"},
+   {l:"Rage-quit and freelance full time.",e:{cash:-300,vibes:3},
+    x:"Freelance can win long-term, but going in with *no runway or clients* means months of thin income. Build the bridge before you jump."}]},
+ {t:"Your friend wants to borrow $400",
+  b:"Close friend, tough month, promises to pay it back 'next week, for real'. You have the cash. What now?",
+  c:[
+   {l:"Lend it, no questions.",e:{cash:-400,vibes:5},
+    x:"Loans between friends usually turn into gifts with resentment attached. *Only lend what you can afford to lose* — emotionally too."},
+   {l:"Give $150 as a gift, keep it clean.",e:{cash:-150,vibes:8},
+    x:"A smaller amount you never expect back protects both the friend and the friendship. *Clear beats generous-then-bitter.*"},
+   {l:"Say no, offer to help another way.",e:{vibes:-4},
+    x:"'No' is a full sentence in finance. Boundaries feel bad for a day; *a drained emergency fund feels bad for months.*"}]},
+ {t:"Trading app free-trial hype",
+  b:"An app pushes 0DTE options with confetti animations. 'Users made 400% this week!' Your $600 savings is right there.",
+  c:[
+   {l:"YOLO $500 into options.",e:{cash:-500,vibes:-10},
+    x:"Options are leveraged bets where *most retail traders lose money* — the confetti is for the app's revenue, not yours. That was gambling with a nice UI."},
+   {l:"Auto-invest $100/mo into an index fund.",e:{auto:100,vibes:2},
+    x:"*Dollar-cost averaging*: same amount, every month, ignore the noise. Boring, automatic, and historically the retail strategy that actually works."},
+   {l:"Keep it all in checking, markets are scary.",e:{},
+    x:"Zero risk isn't zero cost — at ~3% inflation, cash in checking *quietly loses buying power every year*. Long-term money needs to grow."}]},
+ {t:"Subscription audit",
+  b:"You count them up: streaming ×4, cloud storage, a fitness app you opened twice. $87/month total. Cancel spree?",
+  c:[
+   {l:"Cancel everything unused in 30 days.",e:{recur:52,vibes:1},
+    x:"Subscriptions are designed to be forgotten. A 10-minute audit found *$52/mo — that's $624 a year*. Recurring cuts beat one-time cuts because they repeat."},
+   {l:"Keep them all, it's only small money.",e:{vibes:1},
+    x:"'Only $9.99' times eight is the modern budget leak. *Small recurring beats big one-time* — in damage as well as savings."},
+   {l:"Split family plans with friends.",e:{recur:30,vibes:3},
+    x:"Legit family plans cut those costs 60-80%. Same life, less burn — *optimizing beats abstaining.*"}]},
+ {t:"Car moment: yours dies",
+  b:"The beater finally quits. Options: a used car in cash, or a 72-month loan on something shiny at 11% APR.",
+  c:[
+   {l:"Finance the shiny one, $340/mo for 6 years.",e:{recur:-340,vibes:8,credit:5,debt:2000},
+    x:"A 72-month loan at 11% means paying *thousands extra for a thing that loses value daily*. Long loans make payments 'fit' by making the total worse."},
+   {l:"Buy a $2,400 used car in cash.",e:{cash:-2400,vibes:-2},
+    x:"Ouch now, free later: no interest, no monthly payment, cheaper insurance. *Total cost of ownership* is the number that matters — not the monthly."},
+   {l:"Skip the car, transit + bike for now.",e:{recur:-60,vibes:-4},
+    x:"The cheapest car is none. Not always possible — but when it is, *a $0 car budget funds everything else faster than any hack.*"}]},
+ {t:"Tax refund: $720 appears",
+  b:"Free money energy. The mall is calling. So is your credit card balance. So is your future.",
+  c:[
+   {l:"Treat yourself, all of it.",e:{vibes:9},
+    x:"A refund isn't a bonus — it's *your own money returned without interest*. Spending 100% of it means your past self worked overtime for a mall trip."},
+   {l:"Split it: 50% invest, 30% save, 20% fun.",e:{cash:216,invest:360,vibes:5},
+    x:"The *50/30/20 split applied to windfalls*: future-you gets most of it, fun still gets paid. This one habit quietly builds wealth."},
+   {l:"Pay down debt first.",e:{cash:0,debt:-720,credit:15,vibes:2},
+    x:"Paying off 27% APR debt is a *guaranteed 27% return* — no investment reliably beats that. Debt first is math, not vibes."}]},
+ {t:"Final boss: lifestyle creep",
+  b:"Year's end. Income is up, and suddenly the 'upgraded everything' life looks normal. Lock in habits, or let it ride?",
+  c:[
+   {l:"Upgrade everything, you earned it.",e:{cash:-500,recur:-200,vibes:8},
+    x:"*Lifestyle creep* is why high earners stay broke: spending auto-scales to income unless you pin it down. The raise vanished into rent-for-stuff."},
+   {l:"Automate first: invest the raise, live on the rest.",e:{auto:150,credit:10,vibes:3},
+    x:"*Pay yourself first.* Money that moves automatically on payday never gets spent by accident. This is the endgame habit — the rest is details."},
+   {l:"One meaningful upgrade, freeze the rest.",e:{cash:-250,vibes:6},
+    x:"Deliberate upgrades are fine — creep is only deadly when it's *unconscious*. One chosen luxury beats ten default ones."}]}
+];
+
+/* ---------- state ---------- */
+const S={};
+function resetState(){
+  Object.assign(S,{
+    cash:800, credit:650, vibes:70,
+    invest:0, debt:0, salary:SALARY, recurring:0, autoInvest:0,
+    month:0, dist:0, speed:4.2,
+    lane:1, playerY:0, running:false, paused:false, over:false,
+    ents:[], spawnT:0, coins:0, hits:0, scamsDodged:0,
+    lessons:[], t:0, shake:0
+  });
+}
+
+/* ---------- canvas ---------- */
+const cv=$("stage"), cx=cv.getContext("2d");
+let W=0,H=0,DPR=1,LANES=[0,0,0];
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect();
+  DPR=Math.min(devicePixelRatio||1,2);
+  W=r.width;H=r.height;
+  cv.width=Math.max(1,W*DPR);cv.height=Math.max(1,H*DPR);
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  const top=H*0.18, bot=H*0.88, lh=(bot-top)/3;
+  LANES=[top+lh*0.5, top+lh*1.5, top+lh*2.5];
+}
+addEventListener("resize",resize);
+
+/* ---------- entities ---------- */
+function spawn(){
+  const roll=Math.random();
+  const type = roll<0.52?"COIN": roll<0.78?"BILL": roll<0.92?"SCAM":"GEM";
+  const lane=(Math.random()*3)|0;
+  S.ents.push({type,lane,x:W+80,taken:false,bob:Math.random()*6.28});
+  if(type==="COIN"&&Math.random()<0.4){
+    S.ents.push({type:"COIN",lane,x:W+140,taken:false,bob:Math.random()*6.28});
+    S.ents.push({type:"COIN",lane,x:W+200,taken:false,bob:Math.random()*6.28});
+  }
+}
+
+/* ---------- drawing ---------- */
+function roundRect(x,y,w,h,r){cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath();}
+function drawRoad(){
+  cx.fillStyle="#0b0e12";cx.fillRect(0,0,W,H);
+  // skyline blocks (parallax)
+  cx.fillStyle="#151a22";
+  const off=(S.dist*0.25)%160;
+  for(let x=-off;x<W;x+=160){
+    const hgt=40+((Math.abs(x|0)*7919+S.month*31)%97);
+    cx.fillRect(x,H*0.18-hgt*0.6,64,hgt*0.6);
+    cx.fillRect(x+84,H*0.18-hgt*0.42,44,hgt*0.42);
+  }
+  // track band
+  cx.fillStyle="#11151c";cx.fillRect(0,H*0.18,W,H*0.74);
+  // lane divider dashes
+  cx.strokeStyle="#252d39";cx.lineWidth=2;cx.setLineDash([18,22]);
+  const top=H*0.18,bot=H*0.92,lh=(bot-top)/3;
+  const dash=S.dist%40;
+  for(let i=1;i<3;i++){
+    cx.beginPath();
+    cx.moveTo(-dash,top+lh*i);cx.lineTo(W,top+lh*i);cx.stroke();
+  }
+  cx.setLineDash([]);
+  // ground stripe
+  cx.fillStyle="#c8f542";cx.fillRect(0,H*0.92,W,4);
+  cx.fillStyle="#1a2029";cx.fillRect(0,H*0.92+4,W,H-(H*0.92+4));
+}
+function drawPlayer(){
+  const x=Math.max(84,W*0.14), y=S.playerY;
+  const bob=reducedMotion?0:Math.sin(S.t*0.25)*3;
+  cx.save();
+  cx.translate(x,y+bob);
+  // shadow
+  cx.fillStyle="rgba(0,0,0,.45)";cx.beginPath();cx.ellipse(0,30,26,7,0,0,6.29);cx.fill();
+  // legs (simple run cycle)
+  const leg=reducedMotion?0:Math.sin(S.t*0.5)*8;
+  cx.strokeStyle="#eef1f4";cx.lineWidth=5;cx.lineCap="round";
+  cx.beginPath();cx.moveTo(-4,12);cx.lineTo(-8,26+leg);cx.stroke();
+  cx.beginPath();cx.moveTo(6,12);cx.lineTo(10,26-leg);cx.stroke();
+  // body — hoodie
+  cx.fillStyle="#c8f542";roundRect(-15,-14,32,30,8);cx.fill();
+  cx.strokeStyle="#0b0e12";cx.lineWidth=3;roundRect(-15,-14,32,30,8);cx.stroke();
+  // head
+  cx.fillStyle="#f2f0e9";cx.beginPath();cx.arc(2,-24,12,0,6.29);cx.fill();
+  cx.strokeStyle="#0b0e12";cx.lineWidth=3;cx.beginPath();cx.arc(2,-24,12,0,6.29);cx.stroke();
+  // cap
+  cx.fillStyle="#ff5d8f";cx.beginPath();cx.arc(2,-27,12,3.34,6.1);cx.fill();
+  cx.fillRect(2,-32,16,5);
+  // eye
+  cx.fillStyle="#0b0e12";cx.beginPath();cx.arc(7,-24,2,0,6.29);cx.fill();
+  // backpack
+  cx.fillStyle="#5dc9ff";roundRect(-24,-10,10,18,4);cx.fill();
+  cx.strokeStyle="#0b0e12";cx.lineWidth=2.5;roundRect(-24,-10,10,18,4);cx.stroke();
+  cx.restore();
+}
+function drawEnt(e){
+  const y=LANES[e.lane]+(reducedMotion?0:Math.sin(e.bob+S.t*0.12)*4);
+  cx.save();cx.translate(e.x,y);
+  cx.textAlign="center";cx.textBaseline="middle";
+  if(e.type==="COIN"){
+    cx.fillStyle="#ffd23f";cx.beginPath();cx.arc(0,0,15,0,6.29);cx.fill();
+    cx.strokeStyle="#0b0e12";cx.lineWidth=3;cx.beginPath();cx.arc(0,0,15,0,6.29);cx.stroke();
+    cx.fillStyle="#0b0e12";cx.font="700 15px ui-monospace,Menlo,monospace";cx.fillText("$",0,1);
+  }else if(e.type==="GEM"){
+    cx.fillStyle="#5dc9ff";cx.beginPath();
+    cx.moveTo(0,-16);cx.lineTo(14,0);cx.lineTo(0,16);cx.lineTo(-14,0);cx.closePath();cx.fill();
+    cx.strokeStyle="#0b0e12";cx.lineWidth=3;cx.stroke();
+    cx.strokeStyle="rgba(255,255,255,.7)";cx.lineWidth=2;cx.beginPath();cx.moveTo(-4,-6);cx.lineTo(3,-10);cx.stroke();
+  }else if(e.type==="BILL"){
+    cx.fillStyle="#f2f0e9";roundRect(-24,-28,48,56,5);cx.fill();
+    cx.strokeStyle="#ff4d4d";cx.lineWidth=3;roundRect(-24,-28,48,56,5);cx.stroke();
+    cx.fillStyle="#ff4d4d";cx.font="800 11px ui-monospace,Menlo,monospace";
+    cx.fillText("BILL",0,-14);
+    cx.fillStyle="#0b0e12";
+    cx.fillRect(-16,-4,32,3);cx.fillRect(-16,4,32,3);cx.fillRect(-16,12,22,3);
+    cx.save();cx.rotate(-0.22);cx.fillStyle="#ff4d4d";cx.font="800 10px ui-monospace,Menlo,monospace";cx.fillText("DUE!",2,23);cx.restore();
+  }else{ // SCAM
+    cx.fillStyle="#1a2029";roundRect(-26,-26,52,52,10);cx.fill();
+    cx.strokeStyle="#ff5d8f";cx.lineWidth=3;roundRect(-26,-26,52,52,10);cx.stroke();
+    cx.fillStyle="#ff5d8f";roundRect(-16,-16,32,20,5);cx.fill();
+    cx.fillStyle="#0b0e12";cx.font="800 10px ui-monospace,Menlo,monospace";
+    cx.fillText("10x!!",0,-6);
+    cx.fillStyle="#ff5d8f";cx.font="800 9px ui-monospace,Menlo,monospace";cx.fillText("SCAM DM",0,14);
+  }
+  cx.restore();
+}
+
+/* ---------- HUD / toast ---------- */
+function hud(){
+  $("v-cash").textContent=fmt$(S.cash);
+  $("stat-cash").classList.toggle("neg",S.cash<0);
+  $("v-credit").textContent=String(Math.round(S.credit));
+  $("v-vibes").textContent=String(Math.round(S.vibes));
+  $("bar-vibes").style.width=clamp(S.vibes,0,100)+"%";
+  $("month-pill").textContent=MONTHS[clamp(S.month,0,11)];
+}
+let toastT=null;
+function toast(msg,bad){
+  const t=$("toast");
+  t.textContent=msg;
+  t.classList.toggle("bad",!!bad);
+  t.classList.add("show");
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>t.classList.remove("show"),1400);
+}
+
+/* ---------- decisions ---------- */
+function openCard(){
+  S.paused=true;
+  const d=DECK[S.month];
+  $("card-tag").textContent=`Payday ${S.month+1}/12 · +${fmt$(S.salary)} in · ${fmt$(RENT)} rent out`;
+  $("card-title").textContent=d.t;
+  $("card-body").textContent=d.b;
+  const box=$("card-choices");box.replaceChildren();
+  $("card-lesson").classList.remove("on");
+  d.c.forEach((c,i)=>{
+    const b=el("button","choice");
+    b.appendChild(el("span","key",String(i+1)));
+    b.appendChild(el("span",null,c.l));
+    b.onclick=()=>pick(i);
+    box.appendChild(b);
+  });
+  $("overlay").classList.add("on");
+  cardKeys(true);
+  const first=box.querySelector(".choice");
+  if(first)first.focus();
+}
+function pick(i){
+  const d=DECK[S.month],c=d.c[i],e=c.e;
+  const deltaBox=$("lesson-delta");deltaBox.replaceChildren();
+  const addDelta=(label,v,money)=>{
+    if(!v)return;
+    const txt=money
+      ? `${label} ${v>0?"+":"−"}${fmt$(Math.abs(v)).slice(1)}`
+      : `${label} ${v>0?"+":""}${v}`;
+    deltaBox.appendChild(el("span",v>0?"up":"down",txt.replace("−$","−$")));
+  };
+  if(e.cash){S.cash+=e.cash;addDelta("CASH $",Math.round(e.cash),false);}
+  if(e.invest){S.invest+=e.invest;addDelta("INVESTED $",e.invest,false);}
+  if(e.debt>0){S.debt+=e.debt;addDelta("DEBT $",e.debt,false);}
+  else if(e.debt<0){ // paydown: capped at real debt, costs that much cash
+    const pay=Math.min(-e.debt,S.debt);
+    S.debt-=pay;S.cash-=pay;
+    if(pay)addDelta("DEBT $",-pay,false);
+  }
+  if(e.credit){S.credit=clamp(S.credit+e.credit,300,850);addDelta("CREDIT",e.credit,false);}
+  if(e.vibes){S.vibes=clamp(S.vibes+e.vibes,0,100);addDelta("VIBES",e.vibes,false);}
+  if(e.salary){S.salary+=e.salary;addDelta("SALARY/mo $",e.salary,false);}
+  if(e.recur){S.recurring+=e.recur;addDelta("MONTHLY $",e.recur,false);}
+  if(e.auto){S.autoInvest+=e.auto;addDelta("AUTO-INVEST/mo $",e.auto,false);}
+  S.lessons.push(d.t);
+  document.querySelectorAll("#card-choices .choice").forEach((b,bi)=>{
+    b.disabled=true;
+    b.classList.toggle("picked",bi===i);
+    b.classList.toggle("faded",bi!==i);
+  });
+  setRich($("lesson-text"),c.x);
+  $("card-lesson").classList.add("on");
+  hud();
+  cardKeys(false);
+  $("btn-continue").focus();
+}
+function closeCard(){
+  $("overlay").classList.remove("on");
+  S.month++;
+  if(S.month>=12||S.cash<-600){endRun();return;}
+  S.paused=false;
+  S.speed=4.2+S.month*0.42;
+}
+let keyHandler=null;
+function cardKeys(on){
+  if(keyHandler){removeEventListener("keydown",keyHandler);keyHandler=null;}
+  if(on){
+    keyHandler=ev=>{
+      const n=parseInt(ev.key,10);
+      if(n>=1&&n<=DECK[S.month].c.length)pick(n-1);
+    };
+    addEventListener("keydown",keyHandler);
+  }
+}
+$("btn-continue").onclick=closeCard;
+
+/* ---------- payday ---------- */
+function payday(){
+  const growth=Math.round(S.invest*0.008);      // ~monthly market drift
+  S.invest+=growth+S.autoInvest;
+  if(S.autoInvest)S.cash-=S.autoInvest;
+  S.debt=Math.round(S.debt*1.02);               // carried debt compounds
+  S.cash+=S.salary-RENT+S.recurring;
+  hud();
+  openCard();
+}
+
+/* ---------- collisions / loop ---------- */
+function step(){
+  if(!S.running)return;
+  requestAnimationFrame(step);
+  if(S.paused||S.over){render();return;}
+  S.t++;
+  S.dist+=S.speed;
+  // lane easing
+  const target=LANES[S.lane];
+  S.playerY+=(target-S.playerY)*(reducedMotion?1:0.25);
+  // spawn
+  S.spawnT-=S.speed;
+  if(S.spawnT<=0){spawn();S.spawnT=170+Math.random()*160-S.month*6;}
+  // move + collide
+  const px=Math.max(84,W*0.14);
+  for(const e of S.ents){
+    e.x-=S.speed;
+    if(!e.taken&&e.lane===S.lane&&Math.abs(e.x-px)<34&&Math.abs(LANES[e.lane]-S.playerY)<28){
+      e.taken=true;
+      if(e.type==="COIN"){S.cash+=45;S.coins++;toast("+$45");}
+      else if(e.type==="GEM"){S.invest+=120;toast("+$120 invested ✦");}
+      else if(e.type==="BILL"){S.cash-=130;S.hits++;S.vibes=clamp(S.vibes-2,0,100);toast("-$130 surprise bill",true);S.shake=reducedMotion?0:8;}
+      else{S.cash-=260;S.hits++;S.credit=clamp(S.credit-6,300,850);toast("-$260 got scammed",true);S.shake=reducedMotion?0:12;}
+      hud();
+    }
+    if(e.type==="SCAM"&&!e.taken&&!e.counted&&e.x<px-40){e.counted=true;S.scamsDodged++;}
+  }
+  S.ents=S.ents.filter(e=>e.x>-80&&!e.taken);
+  // month gate
+  if(S.dist>=(S.month+1)*MONTH_DIST){payday();}
+  if(S.cash<-600){endRun();return;}
+  render();
+}
+function render(){
+  cx.save();
+  if(S.shake>0){cx.translate((Math.random()-0.5)*S.shake,(Math.random()-0.5)*S.shake);S.shake*=0.85;if(S.shake<0.5)S.shake=0;}
+  drawRoad();
+  for(const e of S.ents)drawEnt(e);
+  drawPlayer();
+  // month progress line at bottom
+  const p=(S.dist-S.month*MONTH_DIST)/MONTH_DIST;
+  cx.fillStyle="#252d39";cx.fillRect(0,H-6,W,6);
+  cx.fillStyle="#c8f542";cx.fillRect(0,H-6,W*clamp(p,0,1),6);
+  cx.restore();
+}
+
+/* ---------- input ---------- */
+addEventListener("keydown",ev=>{
+  if(!S.running||S.over)return;
+  if(ev.key==="ArrowUp"||ev.key==="w"||ev.key==="W"){S.lane=clamp(S.lane-1,0,2);ev.preventDefault();}
+  else if(ev.key==="ArrowDown"||ev.key==="s"||ev.key==="S"){S.lane=clamp(S.lane+1,0,2);ev.preventDefault();}
+  else if((ev.key==="p"||ev.key==="P")&&!$("overlay").classList.contains("on")){S.paused=!S.paused;}
+});
+cv.addEventListener("pointerdown",ev=>{
+  if(!S.running||S.paused||S.over)return;
+  const r=cv.getBoundingClientRect();
+  const y=(ev.clientY-r.top)/r.height;
+  if(y<0.5)S.lane=clamp(S.lane-1,0,2);else S.lane=clamp(S.lane+1,0,2);
+});
+
+/* ---------- end + grading ---------- */
+function grade(){
+  const nw=S.cash+S.invest-S.debt;
+  if(S.cash<-600)return{g:"F",n:"Account went red. Overdraft fees eat people alive — build the cushion first, then run it back."};
+  let pts=0;
+  pts+=clamp(nw/45,0,100);              // wealth
+  pts+=clamp((S.credit-600)/2.5,0,100); // credit
+  pts+=clamp(S.vibes,0,100);            // life
+  const avg=pts/3;
+  if(avg>=80)return{g:"S",n:"Certified bag-securer. Wealth, credit AND a life. Rare build."};
+  if(avg>=65)return{g:"A",n:"Strong year. Habits locked, future-you says thanks."};
+  if(avg>=50)return{g:"B",n:"Solid, with leaks. Patch the recurring stuff and A is easy."};
+  if(avg>=35)return{g:"C",n:"Survived, barely thrived. The deck said 48-hour rule for a reason."};
+  return{g:"D",n:"The traps won this year. Good news: the game respawns, and so do you."};
+}
+function endRun(){
+  S.over=true;S.running=false;
+  $("overlay").classList.remove("on");
+  cardKeys(false);
+  const nw=S.cash+S.invest-S.debt;
+  const overdraft=S.cash<-600;
+  $("end-title").textContent=overdraft?"Overdrafted.":"Year One: Wrapped";
+  $("end-sub").textContent=`FINANCE RUN · ${overdraft?"RUN ENDED IN "+MONTHS[clamp(S.month,0,11)]:"12 MONTHS SURVIVED"}`;
+  const lines=[
+    ["Cash on hand",fmt$(S.cash)],
+    ["Invested",fmt$(S.invest)],
+    ["Debt",S.debt?"-"+fmt$(S.debt).slice(1):"$0"],
+    ["Credit score",String(Math.round(S.credit))],
+    ["Vibes",Math.round(S.vibes)+"/100"],
+    ["Coins grabbed",String(S.coins)],
+    ["Scam DMs dodged",String(S.scamsDodged)],
+    ["Traps hit",String(S.hits)],
+  ];
+  const box=$("end-lines");box.replaceChildren();
+  for(const [k,v] of lines){
+    const row=el("div","rline");
+    row.appendChild(el("span",null,k));
+    row.appendChild(el("span",null,v));
+    box.appendChild(row);
+  }
+  $("end-networth").textContent=fmt$(nw);
+  const g=grade();
+  $("end-grade").textContent=g.g;
+  $("end-gradenote").textContent=g.n;
+  const ul=$("end-lessons");ul.replaceChildren();
+  const picks=S.lessons.slice(-5);
+  if(picks.length)for(const l of picks)ul.appendChild(el("li",null,l));
+  else ul.appendChild(el("li",null,"Didn't reach a payday. The choices are the whole game — survive to one."));
+  const hs=+(localStorage.getItem("fr-hiscore")||0);
+  if(nw>hs)localStorage.setItem("fr-hiscore",String(Math.round(nw)));
+  show("screen-end");
+}
+
+/* ---------- screens ---------- */
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  $(id).classList.add("on");
+}
+function startRun(){
+  resetState();
+  show("screen-game");
+  resize();
+  S.playerY=LANES[1];
+  S.running=true;
+  hud();
+  requestAnimationFrame(step);
+}
+$("btn-start").onclick=startRun;
+$("btn-again").onclick=startRun;
+$("btn-menu").onclick=()=>{updateHiscore();show("screen-title");};
+function updateHiscore(){
+  const hs=+(localStorage.getItem("fr-hiscore")||0);
+  $("hiscore").textContent=hs?`BEST NET WORTH · ${fmt$(hs)}`:"";
+}
+updateHiscore();
+resize();
+</script>
+</body>
+</html>
