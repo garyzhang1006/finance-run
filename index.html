@@ -235,9 +235,9 @@ canvas{display:block;width:100%;height:100%;background:var(--ink-950)}
     RENT IS DUE &nbsp;✦&nbsp; YOUR BAG WON'T SECURE ITSELF &nbsp;✦&nbsp; CREDIT SCORE IS A VIBE CHECK FROM BANKS &nbsp;✦&nbsp; COMPOUND INTEREST &gt; LOTTERY &nbsp;✦&nbsp; SCAM DMs AHEAD &nbsp;✦&nbsp; PAY YOURSELF FIRST &nbsp;✦&nbsp; RENT IS DUE &nbsp;✦&nbsp; YOUR BAG WON'T SECURE ITSELF &nbsp;✦&nbsp; CREDIT SCORE IS A VIBE CHECK FROM BANKS &nbsp;✦&nbsp; COMPOUND INTEREST &gt; LOTTERY &nbsp;✦&nbsp; SCAM DMs AHEAD &nbsp;✦&nbsp; PAY YOURSELF FIRST
   </span></div>
   <div class="logo-wrap">
-    <span class="kicker">12 months · 1 paycheck at a time</span>
+    <span class="kicker">3 years · 36 paydays · 1 bag</span>
     <h1 class="logo">Finance<span class="alt">Run</span></h1>
-    <p class="tagline">You just got your first job. <b>Dodge the money traps, stack your bag,</b> and survive a full year without your account going red. Every payday, real choices. Every choice, receipts.</p>
+    <p class="tagline">You just got your first job. <b>Dodge the money traps, stack your bag,</b> and survive three years — first job, first apartment, then the big-money era — without your account going red. Every payday, real choices. Every choice, receipts.</p>
     <button class="btn btn-primary" id="btn-start">Run it</button>
     <div class="howto">
       <span class="chip">
@@ -355,14 +355,13 @@ function el(tag,cls,txt){
 }
 
 const MONTHS=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-const SALARY=1450;          // monthly take-home
-const RENT=700;             // auto-charged at payday
 const MONTH_DIST=2600;      // px of road per month
 
-/* ---------- payday decision deck (the curriculum) ----------
-   effects: cash, invest, debt, credit, vibes, salary (permanent/mo),
-   recur (permanent monthly cash delta), auto (monthly auto-invest) */
-const DECK=[
+/* ---------- payday decision decks (the curriculum, one per year) ----------
+   effects: cash, invest, investPct (multiplies portfolio), debt, credit,
+   vibes, salary (permanent/mo), recur (permanent monthly cash delta),
+   auto (monthly auto-invest) */
+const DECK_Y1=[
  {t:"First paycheck just hit",
   b:"$1,450 lands after rent. Group chat is planning a weekend trip that costs $400. What's the move?",
   c:[
@@ -473,13 +472,244 @@ const DECK=[
     x:"Deliberate upgrades are fine — creep is only deadly when it's *unconscious*. One chosen luxury beats ten default ones."}]}
 ];
 
+/* ---------- YEAR 2: moved out, real bills ---------- */
+const DECK_Y2=[
+ {t:"Apartment hunt: deposit due",
+  b:"You're moving out. First month + security deposit on a solo studio runs $1,900. Roommates would halve it.",
+  c:[
+   {l:"Solo studio. Privacy is priceless.",e:{cash:-1900,vibes:9},
+    x:"Housing is the biggest line in any budget. The *30% rule*: rent above 30% of income quietly strangles every other goal."},
+   {l:"Split a 2-bed with a roommate.",e:{cash:-950,vibes:-2},
+    x:"Splitting rent is the single biggest money hack available in your 20s. *$950 saved now, plus hundreds monthly* — that's an investing head start."},
+   {l:"Stay home 6 more months, stack cash.",e:{cash:600,vibes:-6},
+    x:"Unfashionable, mathematically elite. Six months of near-zero rent can fund *an entire emergency fund*. Leave when the cushion exists."}]},
+ {t:"Renters insurance pitch",
+  b:"$15/month covers theft, fire, water damage on everything you own. Your laptop alone is worth $1,200. Worth it?",
+  c:[
+   {l:"Buy the basic $15/mo policy.",e:{recur:-15,vibes:2},
+    x:"Insurance is buying a ceiling on disaster. *$180/yr vs $5k+ to replace everything* is the cheapest peace of mind in finance."},
+   {l:"Skip it, nothing bad ever happens.",e:{vibes:1},
+    x:"Going uninsured is a bet where you win $15/mo and can lose everything you own. *Insure what you can't afford to replace.*"},
+   {l:"Buy the deluxe plan with every add-on.",e:{recur:-45,vibes:1},
+    x:"Over-insuring is real too: add-ons for gadgets you don't own. Cover the catastrophe, *skip the upsells.*"}]},
+ {t:"401(k) match unlocked",
+  b:"New job matches 100% of what you put in, up to 5% of pay. HR says most people your age don't enroll.",
+  c:[
+   {l:"Enroll at the full 5% match.",e:{auto:150,vibes:1},
+    x:"An employer match is a *100% instant return* — the single best deal in all of finance. Skipping it is declining free salary."},
+   {l:"Later. Retirement is 40 years away.",e:{vibes:2},
+    x:"'Later' is the expensive word: money invested in your 20s gets *decades of compounding* that 30s money never catches. Time beats amount."},
+   {l:"Enroll at 1% to test the waters.",e:{auto:40,vibes:1},
+    x:"Better than zero, but under the match cap you're *leaving free money unclaimed*. At minimum, always take the full match."}]},
+ {t:"Health insurance open enrollment",
+  b:"High-deductible plan: $80/mo. Mid plan: $140/mo. No plan: $0 and pray. You're healthy... probably.",
+  c:[
+   {l:"High-deductible plan + save the difference.",e:{recur:-80,vibes:1},
+    x:"Fine choice for the healthy — *if you bank the premium savings* for the deductible. HDHP + HSA is a legit strategy, not a gamble."},
+   {l:"Mid plan, predictable copays.",e:{recur:-140,vibes:3},
+    x:"Paying more monthly to cap surprise costs is *buying predictability*. Neither plan is 'wrong' — the wrong move is not knowing your deductible."},
+   {l:"No insurance. Vibes-based healthcare.",e:{vibes:-3,credit:-5},
+    x:"One ER visit averages *$2,700+* uninsured, and medical debt wrecks credit. Insurance isn't optional infrastructure."}]},
+ {t:"Credit utilization check",
+  b:"Your card limit is $2,000 and you've been riding at $1,500 all month for the points. Score dipped. Why?",
+  c:[
+   {l:"Keep balances under 30% of the limit.",e:{credit:22},
+    x:"*Utilization is ~30% of your score.* Riding at 75% reads as 'stretched thin' even if you pay in full. Under 30%, ideally under 10%."},
+   {l:"Max the card monthly, points are points.",e:{credit:-18,cash:40},
+    x:"$40 of points, minus a cheaper score: high utilization can cost you *thousands* on future loan rates. Points never beat rate."},
+   {l:"Request a limit increase, spend the same.",e:{credit:15},
+    x:"Same spending on a higher limit = lower utilization automatically. A 5-minute request that *raises your score without spending less.*"}]},
+ {t:"Rent-to-own couch",
+  b:"'$23/WEEK, NO CREDIT CHECK!' The couch retails for $500. The contract runs 52 weeks. Do the math before you sit.",
+  c:[
+   {l:"Sign it. $23 is basically nothing.",e:{recur:-92,vibes:5},
+    x:"$23 × 52 weeks = *$1,196 for a $500 couch* — a 139% markup aimed at people who don't multiply. 'Low weekly payments' is the oldest trap in retail."},
+   {l:"Facebook Marketplace, $120 cash.",e:{cash:-120,vibes:2},
+    x:"Used furniture depreciates ~70% the moment it leaves the store. *Buy the depreciation, not the markup.*"},
+   {l:"Floor cushions until you can pay cash.",e:{vibes:-5},
+    x:"Waiting works, but comfort has value too. The lesson isn't 'never buy' — it's *never finance a depreciating $500 object at 139%.*"}]},
+ {t:"Side hustle money hits different",
+  b:"Weekend freelance gigs bring in $400/mo. Nobody withholds taxes on it. Nobody... yet.",
+  c:[
+   {l:"Take it, set aside 25% for taxes.",e:{salary:300,vibes:2},
+    x:"Self-employment income owes *income tax AND self-employment tax*. Skim 25-30% into a separate account on arrival and April is boring."},
+   {l:"Take it, spend every dollar.",e:{salary:400,debt:600,vibes:3},
+    x:"The IRS always collects. Untaxed hustle income becomes a *surprise April bill plus penalties* — the classic freelancer faceplant."},
+   {l:"Pass. Weekends are for living.",e:{vibes:4},
+    x:"Legit choice: burnout has costs too. Just know income is the *highest-leverage variable* — a hustle now can fund freedom later."}]},
+ {t:"Text from 'your bank': account locked",
+  b:"'URGENT: verify your identity in 10 minutes or lose access.' There's a link. It looks... almost real.",
+  c:[
+   {l:"Click fast, enter login to unlock.",e:{cash:-500,credit:-12,vibes:-6},
+    x:"Urgency is the tell. *Banks never ask for credentials via link.* Phishing kits clone bank pages pixel-perfect — the rush is the whole con."},
+   {l:"Call the number on the back of your card.",e:{vibes:3},
+    x:"Out-of-band verification: *contact the institution through a channel YOU choose*, never the one the message provides. This one habit defeats most fraud."},
+   {l:"Ignore all bank messages forever.",e:{vibes:-2},
+    x:"Overcorrection has costs — real fraud alerts exist. The rule isn't 'trust nothing', it's *verify through your own channel.*"}]},
+ {t:"Concert: dynamic pricing hits $380",
+  b:"Your artist. Prices 'may change based on demand' and demand is cooked. Group chat is buying NOW.",
+  c:[
+   {l:"Pay $380 before it goes higher.",e:{cash:-380,vibes:9},
+    x:"Dynamic pricing weaponizes FOMO — 'buy before it rises' is the *pressure tactic itself*. Sometimes worth it; know you're paying for panic."},
+   {l:"Wait for verified resale below face.",e:{cash:-160,vibes:5},
+    x:"Prices for most shows *drop near the date* as sellers panic instead. Patience flips who's under pressure."},
+   {l:"Skip, host a listening party.",e:{vibes:2},
+    x:"The experience budget is real and finite. Skipping one $380 night funds *three smaller nights that bond the same group.*"}]},
+ {t:"Debt cleanup strategy",
+  b:"Leftover balances from year one linger. Two schools of thought: math versus momentum. Pick your poison.",
+  c:[
+   {l:"Avalanche: highest APR first.",e:{cash:-300,debt:-300,credit:12},
+    x:"*Avalanche minimizes total interest paid* — mathematically optimal. If you trust yourself to stick with it, this wins on paper every time."},
+   {l:"Snowball: smallest balance first.",e:{cash:-200,debt:-200,credit:8,vibes:5},
+    x:"*Snowball wins on psychology*: quick kills keep you motivated. The best payoff plan is the one you actually finish."},
+   {l:"Minimums only, invest the rest.",e:{cash:-50,debt:-50,invest:200},
+    x:"Only defensible when debt APR is *below* expected returns (~7%). Card debt at 27% loses that race every single time."}]},
+ {t:"Bonus drop: $600",
+  b:"Performance bonus lands. Emergency fund sits at 1 month of expenses. New phone also exists. Choose.",
+  c:[
+   {l:"Emergency fund to 3 months. Boring wins.",e:{cash:600,vibes:2},
+    x:"Cushion first, everything else second. An emergency fund isn't idle money — *it's what makes every other risk affordable.*"},
+   {l:"Straight into investments.",e:{invest:600,vibes:1},
+    x:"Aggressive, but investing before the cushion means a bad month forces you to *sell at the worst time*. Sequence matters: fund, then invest."},
+   {l:"New phone. Camera's insane.",e:{cash:-400,vibes:7},
+    x:"A $600 bonus becoming a $1,000 phone (with the trade-in games) is how windfalls evaporate. *Windfalls follow the same budget as paychecks.*"}]},
+ {t:"Year 2 boss: lease renewal +$150",
+  b:"Landlord raises rent $150/mo, 'market rates'. You've paid on time for 11 months. Sign, fight, or fly?",
+  c:[
+   {l:"Negotiate with comps + on-time history.",e:{recur:-60,vibes:4,credit:5},
+    x:"Landlords price in turnover costs — a reliable tenant has *leverage*. Comps + payment history knocked $90 off the hike. Everything is negotiable."},
+   {l:"Sign it. Moving is worse.",e:{recur:-150,vibes:-2},
+    x:"Sometimes true — moving costs real money too. But accepting the *first number without a counter* trains every future landlord you'll have."},
+   {l:"Move 20 min further out, $100 cheaper.",e:{recur:100,vibes:-4},
+    x:"Run *total cost*: cheaper rent minus extra transit, time, and delivery fees. Distance is a price too — sometimes worth it, never free."}]}
+];
+
+/* ---------- YEAR 3: big money era ---------- */
+const DECK_Y3=[
+ {t:"Roth IRA or nah",
+  b:"You can spare $500 for long-term investing. Roth IRA, regular brokerage, or keep it liquid?",
+  c:[
+   {l:"Open the Roth IRA.",e:{invest:500,credit:0,vibes:1},
+    x:"Roth = pay tax now, *never again* — decades of growth withdrawn tax-free. For young, lower-bracket earners it's the best wrapper there is."},
+   {l:"Regular brokerage, no rules on my money.",e:{invest:500},
+    x:"Flexibility costs you the tax shield: brokerage gains get taxed. Fine for mid-term goals, but *retirement money belongs in wrappers.*"},
+   {l:"Savings account. Markets still scare me.",e:{cash:0,vibes:1},
+    x:"Three years in, the pattern holds: *cash for the short term, markets for the long term.* Fear priced in decades costs more than any crash."}]},
+ {t:"Job offer: startup equity math",
+  b:"A startup offers +$400/mo and equity 'worth millions someday'. Current job is stable. Recruiter says decide fast.",
+  c:[
+   {l:"Take it — salary bump is real, equity is bonus.",e:{salary:400,vibes:4},
+    x:"Right frame: *value the cash, treat equity as a lottery ticket.* Most startup equity expires worthless — the salary is the only guaranteed part."},
+   {l:"Stay. Stability compounds too.",e:{vibes:1,credit:5},
+    x:"Not every move is up. But run the numbers: staying without a counter-offer *forfeits your market price*. Loyalty should be paid, not assumed."},
+   {l:"Use the offer to counter at current job.",e:{salary:250,vibes:3},
+    x:"A competing offer is *leverage, not betrayal*. Most raises in a career come from moves or credible threats of moves."}]},
+ {t:"Markets drop 20% overnight",
+  b:"Your portfolio is red. Feeds are screaming crash. Your thumb hovers over the sell button.",
+  c:[
+   {l:"Sell everything before it gets worse.",e:{investPct:-0.2,vibes:-6},
+    x:"Selling in a crash *converts a paper loss into a real one* — and you'll miss the rebound waiting to 'feel safe'. Missing the 10 best days halves returns."},
+   {l:"Buy more. Stocks are on sale.",e:{cash:-400,invest:400,vibes:2},
+    x:"If the plan was decades long, a 20% discount is *opportunity, not omen*. This is DCA's finest hour."},
+   {l:"Close the app. Do nothing.",e:{vibes:3},
+    x:"Often the elite move. *Time in the market beats timing the market* — the portfolio that gets forgotten frequently beats the one that gets managed."}]},
+ {t:"'$600 course reveals my 7-figure system'",
+  b:"A finfluencer's ad follows you everywhere. Testimonials glow. The 'system' is behind a paywall.",
+  c:[
+   {l:"Buy it. Investment in yourself, right?",e:{cash:-600,vibes:-4},
+    x:"The guru's actual system is *selling courses*. If a strategy printed money, selling it for $600 would be irrational. The course IS the revenue."},
+   {l:"Library + free resources first.",e:{vibes:3},
+    x:"Every genuine personal-finance principle fits in a *$0 library book*: index funds, emergency fund, match, utilization. Paywalled 'secrets' are marketing."},
+   {l:"Buy it, then chargeback later.",e:{cash:-200,credit:-8},
+    x:"Chargeback abuse has receipts — merchants win most disputes on digital goods and *banks flag serial disputers*. Don't buy what you plan to unbuy."}]},
+ {t:"Car insurance renewal creep",
+  b:"Renewal quote is up 18% with zero claims. Same company since forever. Loyalty means... what exactly?",
+  c:[
+   {l:"Auto-renew. Shopping is a chore.",e:{recur:-40,vibes:1},
+    x:"Insurers charge a measurable *loyalty penalty* — auto-renewers absorb hikes that shoppers don't. Set a calendar reminder, not a vibe."},
+   {l:"Get 3 quotes, switch or leverage.",e:{recur:45,vibes:1},
+    x:"20 minutes of quotes routinely saves *hundreds a year* — and your current insurer often matches when you show them. Shopping IS the discount."},
+   {l:"Drop to state-minimum coverage.",e:{recur:80,vibes:-2},
+    x:"Cheap until it isn't: minimum liability leaves *your savings exposed* in a serious accident. Deductibles you can afford, coverage you can't skip."}]},
+ {t:"Moving in together: the money talk",
+  b:"You and your partner are getting a place. Nobody has mentioned money yet. Somebody has to.",
+  c:[
+   {l:"Merge everything, one account, full trust.",e:{vibes:4},
+    x:"Works for some — but total merging *before testing habits* removes every buffer. Most planners suggest keeping some autonomy either way."},
+   {l:"Yours-mine-ours: split bills proportional to income.",e:{vibes:7},
+    x:"*Proportional beats 50/50* when incomes differ — same sacrifice, not same dollars. Shared goals, personal autonomy, fewer fights."},
+   {l:"Avoid the talk, split rent, wing the rest.",e:{vibes:-8},
+    x:"Money conflict is a *top predictor of breakups* — and silence is where it grows. One awkward conversation now beats a hundred silent resentments."}]},
+ {t:"Transmission dies: $800, car needed Monday",
+  b:"A payday-loan shop glows on the corner: 'CASH IN 15 MINUTES.' Your emergency fund side-eyes you.",
+  c:[
+   {l:"Payday loan, deal with it next check.",e:{cash:800,debt:1100,credit:-10,vibes:-4},
+    x:"Payday loans average *~400% APR* — the $800 becomes $1,100+ fast, and most borrowers re-borrow. It's a debt treadmill wearing a rescue costume."},
+   {l:"0% intro APR card, strict 3-month payoff plan.",e:{cash:800,debt:800,credit:-3},
+    x:"Workable *only with a written payoff plan* — 0% intros expire into 25%+ and the deferred interest lands retroactively on some cards. Read the terms twice."},
+   {l:"Emergency fund. This is the emergency.",e:{cash:-800,vibes:2},
+    x:"The fund did its one job: *a crisis became an inconvenience*. Rebuild it next; that's the cycle working as designed."}]},
+ {t:"Tax refund was $2,100 this year",
+  b:"Feels like winning. Your W-4 disagrees — that was your money, loaned to the government at 0% interest.",
+  c:[
+   {l:"Adjust W-4 to near-zero refund.",e:{salary:80,vibes:1},
+    x:"A big refund is *your own paycheck, delayed a year, interest-free*. Adjusting withholding puts ~$175/mo back where it compounds: with you."},
+   {l:"Keep the big refund. Forced savings.",e:{vibes:3},
+    x:"If the alternative is spending it, forced savings has real value — *behavioral truth beats math* sometimes. Just call it what it is."},
+   {l:"Pay a pro $200 to optimize everything.",e:{cash:-200,vibes:1},
+    x:"Worth it once income gets complicated (hustles, equity, states). For one W-2? *Free filing tools do the same job.* Complexity decides."}]},
+ {t:"The down-payment question",
+  b:"Everyone's asking when you'll buy a house. A down payment needs ~$300/mo saved for years. Do you start?",
+  c:[
+   {l:"Auto-transfer $300/mo to a high-yield savings.",e:{auto:300,vibes:2},
+    x:"Money needed *within ~5 years doesn't belong in stocks* — a crash at closing time is fatal. HYSA: boring, safe, exactly right for near goals."},
+   {l:"Renting is fine. Invest the $300 instead.",e:{auto:300,vibes:2},
+    x:"*Rent vs buy is math, not morality* — renting + investing the difference beats buying in plenty of cities. Run the numbers, ignore the aunties."},
+   {l:"Neither. Future me can figure it out.",e:{vibes:5},
+    x:"No shame in not choosing a goal yet — but *unallocated money leaks*. Even 'undecided' savings deserves an automated bucket."}]},
+ {t:"Portfolio check: one stock is 80% of it",
+  b:"Your first stock pick mooned. It's now most of your net worth, and you love it too much to touch it.",
+  c:[
+   {l:"Let it ride. Winners win.",e:{investPct:-0.25,vibes:-5},
+    x:"Concentration built the gain and concentration erased it. *Any single company can go to zero* — diversification is the only free lunch in investing."},
+   {l:"Rebalance most of it into index funds.",e:{vibes:2,credit:0},
+    x:"Selling a winner feels wrong and is usually right. *Rebalancing converts luck into a locked-in base* — the boring move that keeps the money."},
+   {l:"Add bonds + international for real balance.",e:{invest:150,vibes:1},
+    x:"Diversification across *asset classes*, not just more stocks — bonds and international don't crash on the same news as the S&P."}]},
+ {t:"Data breach: your info's out there",
+  b:"Some company you forgot leaked your SSN. Credit monitoring services suddenly want $25/mo to 'protect' you.",
+  c:[
+   {l:"Freeze your credit at all 3 bureaus. Free.",e:{credit:10,vibes:2},
+    x:"A *credit freeze is free, reversible, and actually blocks* new accounts — the one move that works. Unfreeze in minutes when you need a loan."},
+   {l:"Pay $25/mo for monitoring.",e:{recur:-25},
+    x:"Monitoring *tells you about fraud after it happens* — a smoke alarm sold at sprinkler prices. The free freeze prevents; the paid product notifies."},
+   {l:"Ignore it. What are the odds?",e:{cash:-350,credit:-15,vibes:-4},
+    x:"Leaked SSNs get used — new cards, loans, your name. Cleanup averages *months of disputes*. Ten minutes of freezing beats all of it."}]},
+ {t:"Final boss: the 25x question",
+  b:"Three years in. The math says money invested young buys freedom later. How does this story end?",
+  c:[
+   {l:"Automate 25% savings rate. Freedom fund.",e:{auto:350,credit:10,vibes:2},
+    x:"The *25x rule*: invest ~25 times annual spending and work becomes optional. Savings rate — not income, not picks — is the variable that decides when."},
+   {l:"Money's fake. Spend it while young.",e:{cash:-800,vibes:10},
+    x:"Memories compound too — but 'money is fake' stops being cute the first month rent isn't. *Fund the future AND the fun; it was never either-or.*"},
+   {l:"15% automated, live well on the rest.",e:{auto:250,vibes:5},
+    x:"The sustainable middle: *15% automated is quietly wealthy in 20 years* while the other 85% builds a life worth funding. Balance is a strategy."}]}
+];
+
+const LEVELS=[
+ {name:"Year 1 · First Job",   intro:"Entry-level paycheck, big-city dreams.", salary:1450, rent:700,  deck:DECK_Y1},
+ {name:"Year 2 · Moved Out",   intro:"Your own place. Your own bills. Rent went up, but so did the paycheck — real-adult expenses have entered the chat.", salary:1750, rent:950,  deck:DECK_Y2},
+ {name:"Year 3 · Big Money Era",intro:"Promotions, portfolios, and bigger sharks. The traps stop looking like traps — final year, biggest stakes.", salary:2150, rent:1100, deck:DECK_Y3}
+];
+const deck=()=>LEVELS[S.level].deck;
+
 /* ---------- state ---------- */
 const S={};
 function resetState(){
   Object.assign(S,{
     cash:800, credit:650, vibes:70,
-    invest:0, debt:0, salary:SALARY, recurring:0, autoInvest:0,
-    month:0, dist:0, speed:4.2,
+    invest:0, debt:0, salary:LEVELS[0].salary, raise:0, recurring:0, autoInvest:0,
+    level:0, month:0, dist:0, speed:4.2,
     lane:1, playerY:0, running:false, paused:false, over:false,
     ents:[], spawnT:0, coins:0, hits:0, scamsDodged:0,
     lessons:[], t:0, shake:0
@@ -606,7 +836,7 @@ function hud(){
   $("v-credit").textContent=String(Math.round(S.credit));
   $("v-vibes").textContent=String(Math.round(S.vibes));
   $("bar-vibes").style.width=clamp(S.vibes,0,100)+"%";
-  $("month-pill").textContent=MONTHS[clamp(S.month,0,11)];
+  $("month-pill").textContent=`Y${S.level+1} ${MONTHS[clamp(S.month,0,11)]}`;
 }
 let toastT=null;
 function toast(msg,bad){
@@ -621,8 +851,8 @@ function toast(msg,bad){
 /* ---------- decisions ---------- */
 function openCard(){
   S.paused=true;
-  const d=DECK[S.month];
-  $("card-tag").textContent=`Payday ${S.month+1}/12 · +${fmt$(S.salary)} in · ${fmt$(RENT)} rent out`;
+  const d=deck()[S.month];
+  $("card-tag").textContent=`Year ${S.level+1} · Payday ${S.month+1}/12 · +${fmt$(S.salary)} in · ${fmt$(LEVELS[S.level].rent)} rent out`;
   $("card-title").textContent=d.t;
   $("card-body").textContent=d.b;
   const box=$("card-choices");box.replaceChildren();
@@ -640,7 +870,7 @@ function openCard(){
   if(first)first.focus();
 }
 function pick(i){
-  const d=DECK[S.month],c=d.c[i],e=c.e;
+  const d=deck()[S.month],c=d.c[i],e=c.e;
   const deltaBox=$("lesson-delta");deltaBox.replaceChildren();
   const addDelta=(label,v,money)=>{
     if(!v)return;
@@ -657,9 +887,10 @@ function pick(i){
     S.debt-=pay;S.cash-=pay;
     if(pay)addDelta("DEBT $",-pay,false);
   }
+  if(e.investPct){const dv=Math.round(S.invest*e.investPct);S.invest+=dv;if(dv)addDelta("PORTFOLIO $",dv,false);}
   if(e.credit){S.credit=clamp(S.credit+e.credit,300,850);addDelta("CREDIT",e.credit,false);}
   if(e.vibes){S.vibes=clamp(S.vibes+e.vibes,0,100);addDelta("VIBES",e.vibes,false);}
-  if(e.salary){S.salary+=e.salary;addDelta("SALARY/mo $",e.salary,false);}
+  if(e.salary){S.salary+=e.salary;S.raise+=e.salary;addDelta("SALARY/mo $",e.salary,false);}
   if(e.recur){S.recurring+=e.recur;addDelta("MONTHLY $",e.recur,false);}
   if(e.auto){S.autoInvest+=e.auto;addDelta("AUTO-INVEST/mo $",e.auto,false);}
   S.lessons.push(d.t);
@@ -677,9 +908,38 @@ function pick(i){
 function closeCard(){
   $("overlay").classList.remove("on");
   S.month++;
-  if(S.month>=12||S.cash<-600){endRun();return;}
+  if(S.cash<-600){endRun();return;}
+  if(S.month>=12){
+    if(S.level>=LEVELS.length-1){endRun();return;}
+    levelClear();return;
+  }
   S.paused=false;
-  S.speed=4.2+S.month*0.42;
+  S.speed=4.2+S.level*1.4+S.month*0.42;
+}
+/* ---------- level transitions ---------- */
+function levelClear(){
+  S.paused=true;
+  const nxt=LEVELS[S.level+1];
+  $("card-tag").textContent=`YEAR ${S.level+1} CLEAR ✦ LEVEL UP`;
+  $("card-title").textContent=nxt.name;
+  $("card-body").textContent=nxt.intro+` New pay: ${fmt$(nxt.salary+S.raise)}/mo. New rent: ${fmt$(nxt.rent)}/mo. Faster traps ahead.`;
+  const box=$("card-choices");box.replaceChildren();
+  const b=el("button","choice");
+  b.appendChild(el("span","key","→"));
+  b.appendChild(el("span",null,`Start ${nxt.name}`));
+  b.onclick=startNextLevel;
+  box.appendChild(b);
+  $("card-lesson").classList.remove("on");
+  $("overlay").classList.add("on");
+  b.focus();
+}
+function startNextLevel(){
+  S.level++;S.month=0;S.dist=0;S.ents=[];S.spawnT=0;
+  S.salary=LEVELS[S.level].salary+S.raise;
+  $("overlay").classList.remove("on");
+  S.paused=false;
+  S.speed=4.2+S.level*1.4;
+  hud();
 }
 let keyHandler=null;
 function cardKeys(on){
@@ -687,7 +947,7 @@ function cardKeys(on){
   if(on){
     keyHandler=ev=>{
       const n=parseInt(ev.key,10);
-      if(n>=1&&n<=DECK[S.month].c.length)pick(n-1);
+      if(n>=1&&n<=deck()[S.month].c.length)pick(n-1);
     };
     addEventListener("keydown",keyHandler);
   }
@@ -700,7 +960,7 @@ function payday(){
   S.invest+=growth+S.autoInvest;
   if(S.autoInvest)S.cash-=S.autoInvest;
   S.debt=Math.round(S.debt*1.02);               // carried debt compounds
-  S.cash+=S.salary-RENT+S.recurring;
+  S.cash+=S.salary-LEVELS[S.level].rent+S.recurring;
   hud();
   openCard();
 }
@@ -717,7 +977,7 @@ function step(){
   S.playerY+=(target-S.playerY)*(reducedMotion?1:0.25);
   // spawn
   S.spawnT-=S.speed;
-  if(S.spawnT<=0){spawn();S.spawnT=170+Math.random()*160-S.month*6;}
+  if(S.spawnT<=0){spawn();S.spawnT=Math.max(70,170+Math.random()*160-S.month*6-S.level*25);}
   // move + collide
   const px=Math.max(84,W*0.14);
   for(const e of S.ents){
@@ -770,7 +1030,7 @@ function grade(){
   const nw=S.cash+S.invest-S.debt;
   if(S.cash<-600)return{g:"F",n:"Account went red. Overdraft fees eat people alive — build the cushion first, then run it back."};
   let pts=0;
-  pts+=clamp(nw/45,0,100);              // wealth
+  pts+=clamp(nw/(45*(S.level+1)),0,100);  // wealth bar scales per year survived
   pts+=clamp((S.credit-600)/2.5,0,100); // credit
   pts+=clamp(S.vibes,0,100);            // life
   const avg=pts/3;
@@ -786,8 +1046,9 @@ function endRun(){
   cardKeys(false);
   const nw=S.cash+S.invest-S.debt;
   const overdraft=S.cash<-600;
-  $("end-title").textContent=overdraft?"Overdrafted.":"Year One: Wrapped";
-  $("end-sub").textContent=`FINANCE RUN · ${overdraft?"RUN ENDED IN "+MONTHS[clamp(S.month,0,11)]:"12 MONTHS SURVIVED"}`;
+  const survived=S.level*12+clamp(S.month,0,12);
+  $("end-title").textContent=overdraft?"Overdrafted.":"3 Years: Wrapped";
+  $("end-sub").textContent=`FINANCE RUN · ${overdraft?`RUN ENDED Y${S.level+1} `+MONTHS[clamp(S.month,0,11)]:survived+" MONTHS SURVIVED"}`;
   const lines=[
     ["Cash on hand",fmt$(S.cash)],
     ["Invested",fmt$(S.invest)],
