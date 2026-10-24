@@ -309,7 +309,8 @@ const Render = (() => {
     cx.save();
     if (S.shake > 0) {
       cx.translate((Math.random() - 0.5) * S.shake, (Math.random() - 0.5) * S.shake);
-      S.shake = live ? S.shake * Math.pow(0.02, dt) : S.shake; if (S.shake < 0.4) S.shake = 0;
+      // decays in every mode, so a hit that ends the run doesn't leave the report card shaking forever
+      S.shake *= Math.pow(0.02, dt); if (S.shake < 0.4) S.shake = 0;
     }
     drawWorld(THEMES[S.world] || THEMES[0], S.dist || 0, t);
     if (S.rush) rushMarks(S.rush);

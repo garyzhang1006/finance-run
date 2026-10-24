@@ -7,10 +7,10 @@
 const Sfx = (() => {
   let ac = null, master = null, musicGain = null;
   let sfxOn = true, musicOn = true;
-  let musicTimer = null, nextNoteT = 0, step = 0, root = 0, rush = false;
+  let musicTimer = null, nextNoteT = 0, step = 0, root = 0, rush = false, hidden = false;
 
   function ensure() {
-    if (ac) { if (ac.state === "suspended") ac.resume(); return true; }
+    if (ac) { if (ac.state === "suspended" && !hidden) ac.resume(); return true; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return false;
     ac = new AC();
@@ -69,8 +69,10 @@ const Sfx = (() => {
   const BASS = [0, 0, null, 0, -5, null, -5, null, -3, -3, null, -3, -5, null, -7, null];
   const hz = semi => 261.63 * Math.pow(2, semi / 12);
   function schedule() {
-    if (!ac || !musicOn) return;
+    if (!ac || !musicOn || hidden) return;
     const spb = 60 / (rush ? 168 : 132) / 2; // eighth notes
+    // a throttled timer or a long frame leaves missed notes behind; skip them instead of playing them all at once
+    if (nextNoteT < ac.currentTime) { const missed = Math.ceil((ac.currentTime - nextNoteT) / spb); nextNoteT += missed * spb; step += missed; }
     while (nextNoteT < ac.currentTime + 0.15) {
       const at = nextNoteT - ac.currentTime;
       const l = LEAD[step % 16], b = BASS[step % 16];
@@ -82,7 +84,7 @@ const Sfx = (() => {
 
   return {
     unlock: ensure,
-    play(name, arg) { if (sfxOn && ensure() && FX[name]) FX[name](arg); },
+    play(name, arg) { if (sfxOn && !hidden && ensure() && FX[name]) FX[name](arg); },
     startMusic(world = 0) {
       root = [0, 2, 5, -3][world] || 0;
       if (!musicOn || !ensure() || musicTimer) return;
@@ -91,6 +93,8 @@ const Sfx = (() => {
     },
     setRoot(world) { root = [0, 2, 5, -3][world] || 0; },
     setRush(on) { rush = !!on; },
+    /* a hidden tab gets throttled timers, so silence everything until it is visible again */
+    setHidden(h) { hidden = !!h; if (ac) { if (hidden) ac.suspend(); else ac.resume(); } },
     stopMusic() { clearInterval(musicTimer); musicTimer = null; },
     get sfxOn() { return sfxOn; },
     get musicOn() { return musicOn; },

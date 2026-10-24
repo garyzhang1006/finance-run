@@ -543,7 +543,7 @@ function endRun(reason) {
   store.set("badges", [...owned]);
   const nw = netWorth();
   const best = store.get("best", null);
-  const isBest = !best || nw > best;
+  const isBest = best == null || nw > best;
   if (isBest) store.set("best", nw);
   Sfx.play(finished ? "clear" : "lose");
   UI.showEnd({ finished, grade, badges, fresh, nw, isBest });

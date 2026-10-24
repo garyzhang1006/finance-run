@@ -356,6 +356,29 @@ test("Every world draws every item, hat, power, and the rush gates without error
     S.rush = null; return drawn; })()`);
   eq(n, 8, "frames drawn");
 });
+test("A new best needs a higher net worth, even when the old best was $0", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { store.set("best", 0); Object.assign(S, { wallet: 0, savings: 0, invest: 0, debt: 500, hearts: 1, mode: "run" });
+    endRun("hearts"); return [store.get("best", null), /NEW BEST/.test(document.getElementById("panel").textContent)]; })()`);
+  eq(r[0], 0, "best stays $0 after a -$5 run"); eq(r[1], false, "no NEW BEST label");
+});
+test("Losing the last heart to a scam doesn't leave the report card shaking", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { Object.assign(S, { mode: "run", hearts: 1, shield: 0, invuln: 0 });
+    hit({ k: "scam", lane: S.lane, wx: S.dist }, G.PX); const mode = S.mode, shook = S.shake > 0;
+    for (let i = 0; i < 40; i++) Render.draw(1 / 30);
+    return [mode, shook, S.shake]; })()`);
+  eq(r[0], "end", "run ended"); ok(r[1] || matchMedia("(prefers-reduced-motion: reduce)").matches, "hit shook the screen"); eq(r[2], 0, "shake left after 1.3 s");
+});
+test("A hidden tab plays no sound until it is visible again", async () => {
+  await fresh();
+  const r = run(`(() => { let n = 0; const orig = AudioScheduledSourceNode.prototype.start;
+    AudioScheduledSourceNode.prototype.start = function () { n++; return orig.apply(this, arguments); };
+    Sfx.unlock(); Sfx.setSfx(true); Sfx.setHidden(true); Sfx.play("coin"); const hiddenNotes = n;
+    Sfx.setHidden(false); Sfx.play("coin"); const shownNotes = n - hiddenNotes;
+    AudioScheduledSourceNode.prototype.start = orig; return [hiddenNotes, shownNotes > 0]; })()`);
+  eq(r[0], 0, "notes started while hidden"); ok(r[1], "sound plays again once visible");
+});
 
 /* ---------- random input fuzz ---------- */
 test("Random play through menus, shop, pause, and runs never breaks a money rule", async () => {

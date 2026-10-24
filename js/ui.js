@@ -605,7 +605,7 @@ $("btn-badges").addEventListener("click", () => { Sfx.unlock(); Sfx.play("click"
 $("btn-sound").addEventListener("click", () => { Sfx.unlock(); UI.setSound(!UI.prefs.sound); });
 
 /* leaving the tab or window pauses the run instead of letting traps hit */
-document.addEventListener("visibilitychange", () => { if (document.hidden) togglePause(true); });
+document.addEventListener("visibilitychange", () => { Sfx.setHidden(document.hidden); if (document.hidden) togglePause(true); });
 addEventListener("blur", () => togglePause(true));
 addEventListener("resize", () => Render.resize());
 
