@@ -169,6 +169,16 @@ test("Locked choices can't be picked", async () => {
     return [locked.length, !!document.querySelector("#panel .lesson"), S.wallet === before]; })()`);
   ok(r[0] >= 1, "at least one locked choice"); ok(!r[1] && r[2], "clicking a locked choice does nothing");
 });
+test("Each stretch has two quiz gates; answering the first moves the question banner to the second", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.mode = "run"; S.ents = S.gates.slice(); S.cursor = Infinity; const [a, b] = S.gates;
+    S.lane = a.okLane; S.dist = a.wx - 1400; update(0.016); const q1 = document.querySelector("#banner .bq").textContent === a.q;
+    S.dist = a.wx; update(0.016); const moved = S.gate === b;
+    S.dist = b.wx - 1400; update(0.016); const q2 = document.querySelector("#banner .bq").textContent === b.q;
+    const qs = new Set(); S.usedQuiz = new Set(); for (let st = 0; st < STRETCHES; st++) { S.stretch = st; beginStretch(0); S.gates.forEach(g => qs.add(g.q + g.why)); }
+    return [S.gates.length, a.wx < b.wx && b.wx < S.stretchStart + STRETCH_LEN, q1, moved, q2, qs.size]; })()`);
+  eq(r.join(), "2,true,true,true,true,10", "gate count, order, first banner, advance, second banner, distinct questions in a world");
+});
 test("Quiz gate: right lane pays $2, wrong lane pays nothing", async () => {
   await fresh(); startRun();
   const r = run(`(() => { S.mode = "run"; S.ents = [S.gate]; S.cursor = Infinity; S.lane = S.gate.okLane;
@@ -219,7 +229,7 @@ test("A full 4-world run reaches the report card with sane numbers", async () =>
     const nums = ["wallet", "savings", "invest", "debt", "joy", "hearts"].map(k => S[k]);
     return [S.mode, S.world, S.quizTotal, nums.every(Number.isFinite), S.wallet >= 0 && S.savings >= 0, !!document.querySelector("#panel .medal")];
   })()`);
-  eq(r[0], "end", "finished"); eq(r[1], 3, "reached world 4"); eq(r[2], 20, "answered 20 gates");
+  eq(r[0], "end", "finished"); eq(r[1], 3, "reached world 4"); eq(r[2], 40, "answered 40 gates");
   ok(r[3] && r[4], "no NaN or negative balances"); ok(r[5], "report card shown");
 });
 /* ---------- streak, final rush, payday tally ---------- */
@@ -431,7 +441,7 @@ test("Content: every card has 3 choices and lessons, quiz answers fit their sign
       if (wd.cards.length !== STRETCHES) out.push(wi + " has " + wd.cards.length + " cards");
       wd.cards.forEach((cd, ci) => { if (cd.c.length !== 3) out.push(wi + "." + ci + " choices"); cd.c.forEach(ch => { if (!ch.x || !ch.tag) out.push(wi + "." + ci + " missing lesson"); }); });
       wd.quiz.forEach(q => { if (q.a.length !== 3 || !q.why) out.push(q.q); q.a.forEach(a => { if (c.measureText(a).width > 140) out.push("long answer: " + a); }); });
-      if (wd.quiz.length < STRETCHES) out.push(wi + " needs " + STRETCHES + " quiz questions");
+      if (wd.quiz.length < gatesPerWorld()) out.push(wi + " needs " + gatesPerWorld() + " quiz questions");
     }); return out; })()`);
   eq(bad.length, 0, bad.join("; "));
 });

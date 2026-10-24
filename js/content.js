@@ -107,7 +107,9 @@ const WORLDS = [
    { q: "An impulse buy has...", a: ["No plan", "A budget", "A goal"], why: "Impulse buys happen on a sudden feeling, without a plan." },
    { q: "Which one is a NEED?", a: ["Shoes", "Stickers", "Slime"], why: "Shoes protect your feet. Stickers and slime are wants." },
    { q: "$10 minus $4 spent leaves...", a: ["$6", "$14", "$4"], why: "Knowing what's left is the heart of budgeting." },
-   { q: "A savings goal needs...", a: ["A price", "A wish", "Luck"], why: "A real goal has a price, a plan, and a deadline." }
+   { q: "A savings goal needs...", a: ["A price", "A wish", "Luck"], why: "A real goal has a price, a plan, and a deadline." },
+   { q: "Money you get every week", a: ["Allowance", "A loan", "A tax"], why: "An allowance comes regularly, so you can plan with it." },
+   { q: "Save $2 a week for 5 weeks", a: ["$10", "$7", "$2"], why: "5 weeks times $2 is $10. Small amounts add up!" }
   ]
  },
  {
@@ -176,7 +178,9 @@ const WORLDS = [
    { q: "A good price should...", a: ["Cover costs", "Be $100", "Be free"], why: "If your price doesn't cover costs, you lose money." },
    { q: "Someone who starts a business", a: ["Entrepreneur", "Customer", "Banker"], why: "An entrepreneur starts and runs a business." },
    { q: "Giving up one thing for another", a: ["Opportunity cost", "Discount", "Refund"], why: "Opportunity cost is what you give up when you choose." },
-   { q: "Spending to grow your business", a: ["Reinvesting", "Wasting", "Gambling"], why: "Reinvesting puts profit back in to earn more later." }
+   { q: "Spending to grow your business", a: ["Reinvesting", "Wasting", "Gambling"], why: "Reinvesting puts profit back in to earn more later." },
+   { q: "Lemons and cups for your stand", a: ["Costs", "Profit", "Prizes"], why: "Costs are what you spend to make the stuff you sell." },
+   { q: "The person who buys from you", a: ["Customer", "Boss", "Banker"], why: "Customers buy what you sell. Treat them well and they come back!" }
   ]
  },
  {
@@ -245,7 +249,9 @@ const WORLDS = [
    { q: "A tiny piece of a company", a: ["Stock", "Coupon", "Receipt"], why: "A share of stock means you own a tiny bit of a company." },
    { q: "Compound interest's best friend", a: ["Time", "Luck", "Hype"], why: "The longer money grows, the faster it grows." },
    { q: "$100 at 10% interest earns...", a: ["$10", "$1", "$100"], why: "10% of $100 is $10." },
-   { q: "Market drops. Investors should...", a: ["Stay calm", "Sell all", "Hide"], why: "Long-term investors ride out the drops." }
+   { q: "Market drops. Investors should...", a: ["Stay calm", "Sell all", "Hide"], why: "Long-term investors ride out the drops." },
+   { q: "Start saving early to get...", a: ["More growth", "Less money", "No interest"], why: "Money saved early has more time to earn interest on its interest." },
+   { q: "An index fund owns...", a: ["Many companies", "One company", "Only cash"], why: "Owning lots of companies means one bad one can't sink you." }
   ]
  },
  {
@@ -317,7 +323,9 @@ const WORLDS = [
    { q: "A pop-up wants a password", a: ["Close it", "Type it", "Share it"], why: "Never type passwords into pop-ups. Close it and tell an adult." },
    { q: "Pays when bad stuff happens", a: ["Insurance", "Interest", "Inflation"], why: "You pay insurance a little at a time so one accident can't wipe you out." },
    { q: "Money saved for surprises", a: ["Emergency $", "Candy $", "Party $"], why: "An emergency fund covers surprises like a broken phone." },
-   { q: "Credit card bills: pay...", a: ["In full", "Never", "Half"], why: "Pay the whole bill on time and you pay zero interest." }
+   { q: "Credit card bills: pay...", a: ["In full", "Never", "Half"], why: "Pay the whole bill on time and you pay zero interest." },
+   { q: "A text says you WON $1,000!", a: ["A scam", "Lucky day", "A gift"], why: "Prizes for contests you never entered are tricks to get your money or info." },
+   { q: "Borrow $10, owe $1 interest. Repay?", a: ["$11", "$10", "$1"], why: "You pay back what you borrowed PLUS the interest." }
   ]
  }
 ];
@@ -339,7 +347,7 @@ const SHOP = [
 const BADGES = [
   { id: "spotter",  emoji: "🕵️", name: "Scam Spotter",   how: "Dodge 15 scam pop-ups in one run" },
   { id: "saver",    emoji: "🐷", name: "Super Saver",    how: "Finish with savings worth your whole goal" },
-  { id: "whiz",     emoji: "🧠", name: "Quiz Whiz",      how: "Get 18 of 20 quiz gates right" },
+  { id: "whiz",     emoji: "🧠", name: "Quiz Whiz",      how: "Get 36 of 40 quiz gates right" },
   { id: "compound", emoji: "✨", name: "Compound Champ", how: "Earn $15 in interest" },
   { id: "heart",    emoji: "💝", name: "Big Heart",      how: "Give $10 to others" },
   { id: "streak",   emoji: "🔥", name: "On Fire",        how: "Grab 40 coins in a row" },

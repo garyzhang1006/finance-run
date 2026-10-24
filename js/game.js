@@ -24,7 +24,8 @@ const store = {
 };
 
 const STRETCHES = 5;          // paydays per world
-const STRETCH_LEN = 3800;     // logical px of road between paydays
+const STRETCH_LEN = 6400;     // logical px of road between paydays
+const GATE_AT = [0.28, 0.78]; // two quiz gates per stretch, as fractions of its length
 const JUMP_DUR = 0.56, JUMP_H = 84;
 const GATE_WARN = 1500;       // logical px before a quiz gate when the question appears
 const DEBT_RATE = 0.10;       // per payday, deliberately harsh so the lesson shows
@@ -100,19 +101,19 @@ function beginStretch(count) {
   S.speed = 330 + S.world * 38 + S.stretch * 11;
   const deck = WORLDS[S.world].quiz;
   const used = S.usedQuiz || (S.usedQuiz = new Set());
-  const fresh = deck.map((_, i) => i).filter(i => !used.has(S.world + ":" + i));
-  const qi = pickOne(fresh.length ? fresh : deck.map((_, i) => i));
-  used.add(S.world + ":" + qi);
-  const q = deck[qi];
-  const order = [0, 1, 2].sort(() => Math.random() - 0.5);
-  S.gate = {
-    k: "gate", wx: S.stretchStart + STRETCH_LEN * 0.56,
-    q: q.q, why: q.why, answers: order.map(i => q.a[i]), okLane: order.indexOf(0),
-    done: false, shown: false
-  };
-  S.ents.push(S.gate);
+  S.gates = GATE_AT.map(f => {
+    const fresh = deck.map((_, i) => i).filter(i => !used.has(S.world + ":" + i));
+    const qi = pickOne(fresh.length ? fresh : deck.map((_, i) => i));
+    used.add(S.world + ":" + qi);
+    const q = deck[qi];
+    const order = [0, 1, 2].sort(() => Math.random() - 0.5);
+    return { k: "gate", wx: S.stretchStart + STRETCH_LEN * f, q: q.q, why: q.why,
+             answers: order.map(i => q.a[i]), okLane: order.indexOf(0), done: false, shown: false };
+  });
+  S.gate = S.gates[0];   // the next unanswered gate; it drives the banner and the slowdown
+  S.ents.push(...S.gates);
   S.rush = finale ? Object.assign({}, WORLDS[S.world].rush, {
-    start: S.gate.wx + 900, end: S.stretchStart + S.stretchLen - 420,
+    start: S.gates[S.gates.length - 1].wx + 900, end: S.stretchStart + S.stretchLen - 420,
     waves: 0, hits: 0, gold: 0, safe: 1, announced: false, done: false
   }) : null;
   Sfx.setRush(false);
@@ -126,8 +127,8 @@ function beginStretch(count) {
 function spawnAhead() {
   const stretchEnd = S.stretchStart + S.stretchLen, R = S.rush;
   while (S.cursor < S.dist + G.LW + 140) {
-    const gx = S.gate ? S.gate.wx : -1e9;
-    if (S.cursor > gx - 560 && S.cursor < gx + 280) { S.cursor = gx + 280; continue; }
+    const near = (S.gates || []).find(gt => S.cursor > gt.wx - 560 && S.cursor < gt.wx + 280);
+    if (near) { S.cursor = near.wx + 280; continue; }
     if (S.cursor > stretchEnd - 380) { S.cursor = Infinity; break; }
     // regular patterns stop early enough that none overlap the first rush wave,
     // and a wave only starts if all of it fits before the finish line
@@ -146,10 +147,11 @@ function otherLanes(l) { return [0, 1, 2].filter(i => i !== l); }
 function layPattern(x) {
   const d = S.world * STRETCHES + S.stretch;            // difficulty 0..19
   const L = (Math.random() * 3) | 0;
+  // stretches are long enough for two quiz gates, so heart-costing scams are thinned to keep about the same number per payday
   const weights = [
     ["line", 3], ["zigzag", 2], ["cartJump", 1.6 + d * 0.08],
-    ["cartWall", d >= 2 ? 1 + d * 0.1 : 0], ["scam", d >= 1 ? 1 + d * 0.1 : 0],
-    ["combo", d >= 7 ? 0.8 + d * 0.06 : 0], ["cash", 0.7], ["power", 0.55]
+    ["cartWall", d >= 2 ? 1 + d * 0.1 : 0], ["scam", d >= 1 ? (1 + d * 0.1) * 0.6 : 0],
+    ["combo", d >= 7 ? (0.8 + d * 0.06) * 0.6 : 0], ["cash", 0.7], ["power", 0.55]
   ];
   let r = Math.random() * weights.reduce((s, w) => s + w[1], 0), kind = "line";
   for (const [k, w] of weights) { if ((r -= w) < 0) { kind = k; break; } }
@@ -344,6 +346,7 @@ function hit(e, sx) {
 
 function resolveGate(g) {
   g.done = true;
+  S.gate = (S.gates || []).find(x => !x.done) || g;
   S.quizTotal++;
   const right = S.lane === g.okLane;
   if (right) {
@@ -462,7 +465,7 @@ function afterLesson() {
 function worldClear() {
   S.mode = "clear";
   const grew = goalFund() - S.worldSavingsStart;
-  const stars = [true, S.worldQuizRight >= 4, grew >= cents(20)];
+  const stars = [true, S.worldQuizRight >= gatesPerWorld() * 0.8, grew >= cents(20)];
   S.worldStars[S.world] = stars.filter(Boolean).length;
   const healed = S.hearts < 3;
   S.hearts = Math.min(3, S.hearts + 1);
@@ -496,6 +499,7 @@ function buy(item) {
 
 /* paydays left after the current world, for opportunity-cost math in the shop */
 const paydaysLeft = () => (WORLDS.length - 1 - S.world) * STRETCHES;
+const gatesPerWorld = () => GATE_AT.length * STRETCHES;
 
 /* ---------- ending, grade, badges ---------- */
 function gradeRun(finished) {
@@ -515,7 +519,7 @@ function earnedBadges(finished) {
   const reached = goalFund() >= cents(S.goal.price);
   if (S.scamsDodged >= 15) out.push("spotter");
   if (S.savings >= cents(S.goal.price)) out.push("saver");
-  if (S.quizRight >= 18) out.push("whiz");
+  if (S.quizRight >= WORLDS.length * gatesPerWorld() * 0.9) out.push("whiz");
   if (S.interestEarned >= cents(15)) out.push("compound");
   if (S.gave >= cents(10)) out.push("heart");
   if (S.bestCombo >= 40) out.push("streak");

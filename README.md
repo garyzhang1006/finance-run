@@ -20,7 +20,7 @@ The game pauses itself when the tab or window loses focus.
 
 ## What it teaches
 
-Each world has its own money rule, five payday decisions, and a bank of quiz-gate questions.
+Each world has its own money rule, five payday decisions, and ten quiz-gate questions. Two quiz gates stand on the road before every payday, so most of the money questions get answered while running.
 
 | World | Money rule | Topics |
 | --- | --- | --- |
@@ -63,7 +63,7 @@ Money is stored in whole cents so interest never drifts. Game speed is frame-rat
 
 ## Tests
 
-`tests/index.html` runs 35 regression checks against the real game in an iframe: money math at payday, debt and borrowing, every decision card's money adding up, frame-rate independence, blocked storage, lane alignment, pause, quiz gates, traps, the shop, the coin streak, the final rush layout and bonus, keyboard keys, swipes and touch buttons, the title and pause menus, every world's drawing, screen shake after a game over, sound in a hidden tab, and a full 4-world run. One check is a seeded random-input fuzz run through menus, the shop, pause, and four full runs that fails on any negative or fractional balance, impossible hearts or joy, or a panel left open mid-run. Browsers block file-to-file iframe access, so serve the folder first:
+`tests/index.html` runs 36 regression checks against the real game in an iframe: money math at payday, debt and borrowing, every decision card's money adding up, frame-rate independence, blocked storage, lane alignment, pause, both quiz gates in each stretch, traps, the shop, the coin streak, the final rush layout and bonus, keyboard keys, swipes and touch buttons, the title and pause menus, every world's drawing, screen shake after a game over, sound in a hidden tab, and a full 4-world run. One check is a seeded random-input fuzz run through menus, the shop, pause, and four full runs that fails on any negative or fractional balance, impossible hearts or joy, or a panel left open mid-run. Browsers block file-to-file iframe access, so serve the folder first:
 
 ```bash
 python3 -m http.server 8000

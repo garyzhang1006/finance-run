@@ -115,10 +115,10 @@ const UI = (() => {
   function tick() {
     const p = S.stretchStart != null ? clamp((S.dist - S.stretchStart) / S.stretchLen, 0, 1) : 0;
     $("trip-fill").style.width = (p * 100).toFixed(1) + "%";
-    if (lastTrip !== S.stretchStart && S.gate) {
+    if (lastTrip !== S.stretchStart && S.gates) {
       lastTrip = S.stretchStart;
       const at = wx => ((wx - S.stretchStart) / S.stretchLen * 100).toFixed(1) + "%";
-      $("gate-mark").style.left = at(S.gate.wx);
+      document.querySelectorAll(".gate-mark").forEach((m, i) => { m.hidden = !S.gates[i]; if (S.gates[i]) m.style.left = at(S.gates[i].wx); });
       $("rush-mark").hidden = !S.rush;
       if (S.rush) $("rush-mark").style.left = at(S.rush.start);
     }
@@ -335,7 +335,7 @@ const UI = (() => {
       p.appendChild(st);
       const ul = el("ul", "checks");
       ul.appendChild(el("li", null, "✅ Finished all 5 paydays"));
-      ul.appendChild(el("li", null, `${r.stars[1] ? "✅" : "⬜"} Quiz gates: ${S.worldQuizRight} of 5 right (need 4)`));
+      ul.appendChild(el("li", null, `${r.stars[1] ? "✅" : "⬜"} Quiz gates: ${S.worldQuizRight} of ${gatesPerWorld()} right (need ${Math.ceil(gatesPerWorld() * 0.8)})`));
       ul.appendChild(el("li", null, `${r.stars[2] ? "✅" : "⬜"} Goal money grew ${fmt(r.grew)} this world (need $20)`));
       if (r.healed) ul.appendChild(el("li", null, "❤️ Rested up: +1 heart"));
       p.appendChild(ul);
