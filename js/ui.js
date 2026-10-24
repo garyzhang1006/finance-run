@@ -104,14 +104,24 @@ const UI = (() => {
     $("h-hearts").textContent = "❤️".repeat(S.hearts) + "🤍".repeat(Math.max(0, 3 - S.hearts));
     $("h-hearts").setAttribute("aria-label", `${S.hearts} hearts`);
     $("h-joy").textContent = String(Math.round(S.joy));
+    $("c-streak").hidden = S.combo < 2;
+    $("h-streak").textContent = String(S.combo);
+    $("h-mult").textContent = streakTier() ? "×" + streakMult().toFixed(2) : "";
     $("h-joy-ic").textContent = S.joy >= 70 ? "😄" : S.joy >= 40 ? "🙂" : "😕";
     const w = WORLDS[S.world];
     $("trip-label").textContent = `${w.emoji} ${w.name} · Payday ${Math.min(S.stretch + 1, STRETCHES)} of ${STRETCHES}`;
   }
-  let lastPowers = "";
+  let lastPowers = "", lastTrip = null;
   function tick() {
-    const p = S.stretchStart != null ? clamp((S.dist - S.stretchStart) / STRETCH_LEN, 0, 1) : 0;
+    const p = S.stretchStart != null ? clamp((S.dist - S.stretchStart) / S.stretchLen, 0, 1) : 0;
     $("trip-fill").style.width = (p * 100).toFixed(1) + "%";
+    if (lastTrip !== S.stretchStart && S.gate) {
+      lastTrip = S.stretchStart;
+      const at = wx => ((wx - S.stretchStart) / S.stretchLen * 100).toFixed(1) + "%";
+      $("gate-mark").style.left = at(S.gate.wx);
+      $("rush-mark").hidden = !S.rush;
+      if (S.rush) $("rush-mark").style.left = at(S.rush.start);
+    }
     const parts = [];
     if (S.shield > 0) parts.push(`🛡️ Shield x${S.shield}`);
     if (S.x2 > 0) parts.push(`✖️2 Double coins ${Math.ceil(S.x2)}s`);
@@ -124,12 +134,31 @@ const UI = (() => {
     }
   }
 
-  function toast(msg, kind) {
-    const t = $("toast");
+  /* toasts sit under the quiz banner (or in its slot) so they never cover a lane */
+  function toast(msg, kind, ms = 1900) {
+    const t = $("toast"), bn = $("banner");
+    t.style.top = bn.classList.contains("on") ? (bn.offsetTop + bn.offsetHeight + 8) + "px" : "";
     t.textContent = msg;
     t.className = "toast show" + (kind ? " " + kind : "");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove("show"), 1900);
+    toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+  }
+
+  /* the first tier-up explains the compounding rule; later ones only celebrate milestones */
+  function streakUp(tier) {
+    Sfx.play("power");
+    const c = $("c-streak"); c.classList.remove("pop"); void c.offsetWidth; c.classList.add("pop");
+    const mult = "×" + streakMult().toFixed(2);
+    if (!S.streakTold) { S.streakTold = true; toast(`🔥 Streak! Coins grow 10% for every ${STREAK_STEP} in a row. That's compounding!`, "good", 3200); }
+    else if (tier === 4 || tier === STREAK_TIERS) toast(`🔥 ${S.combo} in a row! Every coin is worth ${mult}`, "good");
+  }
+
+  function rush(R) {
+    const c = $("countdown");
+    // the GO! animation already ran on this element, so reset the class before replaying it
+    c.textContent = "FINAL RUSH!"; c.className = "countdown"; void c.offsetWidth; c.className = "countdown go rush";
+    setTimeout(() => { if (c.textContent === "FINAL RUSH!") c.textContent = ""; }, 900);
+    toast(`⚡ ${R.name}: ${R.tip}`, "good", 3000);
   }
 
   function banner(g, ok, msg) {
@@ -214,20 +243,27 @@ const UI = (() => {
     });
   }
 
-  function sumChip(txt, cls) { return el("span", "sum " + (cls || ""), txt); }
-
   function showPayday(sum, card) {
     openPanel(p => {
       p.appendChild(tag(`💰 PAYDAY ${S.stretch + 1} OF ${STRETCHES}`));
-      const row = el("div", "sumrow");
-      row.appendChild(sumChip(`🪙 Coins +${fmt(sum.coins)}`, "up"));
-      row.appendChild(sumChip(`💼 Income +${fmt(sum.income)}`, "up"));
-      if (sum.saved) row.appendChild(sumChip(`🐷 Auto-saved ${fmt(sum.saved)} (${Math.round(S.saveRate * 100)}%)`, "save"));
-      if (sum.interest) row.appendChild(sumChip(`✨ Interest +${fmt(sum.interest)}`, "up"));
-      if (sum.invest) row.appendChild(sumChip(`📈 Investments ${sum.invest > 0 ? "+" : ""}${fmt(sum.invest)}${sum.rebound ? " (bounced back!)" : ""}`, sum.invest > 0 ? "up" : "down"));
-      if (sum.debt) row.appendChild(sumChip(`🧾 Debt interest +${fmt(sum.debt)}`, "down"));
-      if (sum.joy) row.appendChild(sumChip(`🙂 Fun fades ${sum.joy} joy`, "down"));
-      p.appendChild(row);
+      // the payday math counts in one line at a time, each with its own sound
+      const led = el("div", "tally"), lines = [];
+      const line = (ic, label, amt, cls, sfx) => {
+        const d = el("div", "tline " + cls);
+        d.appendChild(el("span", "ti", ic)); d.appendChild(el("span", "tl", label)); d.appendChild(el("b", null, amt));
+        d.style.animationDelay = (lines.length * 0.22) + "s";
+        lines.push(sfx); led.appendChild(d);
+      };
+      line("🪙", "Coins you grabbed", "+" + fmt(sum.coins), "up", "coin");
+      line("💼", S.incomeBonus ? "Allowance + your jobs" : "Allowance", "+" + fmt(sum.income), "up", "coin");
+      if (sum.interest) line("✨", "Interest: the bank paid you for saving!", "+" + fmt(sum.interest), "up star", "star");
+      if (sum.saved) line("🐷", `Moved to savings (your ${Math.round(S.saveRate * 100)}% plan)`, fmt(sum.saved), "save", "cash");
+      if (sum.invest) line("📈", sum.rebound ? "Investments bounced back!" : `Investments went ${sum.invest > 0 ? "up" : "down"}`,
+        (sum.invest > 0 ? "+" : "") + fmt(sum.invest), sum.invest > 0 ? "up" : "down", sum.invest > 0 ? "coin" : "wrong");
+      if (sum.debt) line("🧾", "Debt grew (10% interest)", "+" + fmt(sum.debt), "down", "wrong");
+      if (sum.joy) line("🙂", "Fun fades a little", `${sum.joy} joy`, "down", "tick");
+      p.appendChild(led);
+      lines.forEach((name, i) => setTimeout(() => { if (S.mode === "payday") Sfx.play(name, i * 4); }, 350 + i * 220));
       p.appendChild(el("span", "p-emoji", card.emoji));
       p.appendChild(title(card.t));
       p.appendChild(el("p", "p-body", card.b));
@@ -292,7 +328,10 @@ const UI = (() => {
       p.appendChild(tag(`WORLD ${S.world + 1} CLEAR!`));
       p.appendChild(title(`${w.emoji} ${w.name} done!`));
       const st = el("div", "stars");
-      r.stars.forEach(on => st.appendChild(el("span", on ? "" : "off", "⭐")));
+      r.stars.forEach((on, i) => {
+        st.appendChild(el("span", on ? "" : "off", "⭐"));
+        setTimeout(() => { if (S.mode === "clear") Sfx.play(on ? "star" : "tick"); }, 250 + i * 200);
+      });
       p.appendChild(st);
       const ul = el("ul", "checks");
       ul.appendChild(el("li", null, "✅ Finished all 5 paydays"));
@@ -367,7 +406,7 @@ const UI = (() => {
   /* ---------- report card ---------- */
   function showEnd(r) {
     const gp = cents(S.goal.price), have = goalFund(), reached = have >= gp;
-    const medalColor = { "A+": "#ffb703", A: "#ffd84d", B: "#9fb3d9", C: "#e0915a", D: "#b59cff" }[r.grade.g];
+    const medalColor = { "A+": "#ffb703", A: "#ffd84d", B: "#4cc9ff", C: "#ff9f1c", D: "#ff8fd8" }[r.grade.g];
     openPanel(p => {
       p.appendChild(tag(r.finished ? "🏁 RUN COMPLETE" : "💔 OUT OF HEARTS"));
       p.appendChild(title(r.finished ? "Your money report card" : "Scams got your last heart!"));
@@ -393,6 +432,7 @@ const UI = (() => {
       row("❓ Quiz gates right", `${S.quizRight} of ${S.quizTotal}`);
       row("🕵️ Scams dodged", String(S.scamsDodged));
       row("🔥 Best coin streak", String(S.bestCombo));
+      if (S.rushesRun) row("⚡ Perfect final rushes", `${S.perfectRushes} of ${S.rushesRun}`);
       row("Net worth (what you own minus what you owe)", fmt(r.nw) + (r.isBest ? "  🏆 NEW BEST" : ""), "total");
       p.appendChild(led);
       if (S.wallet >= cents(20)) p.appendChild(rich("p", "p-body", `💡 You ended with *${fmt(S.wallet)} in your wallet* and no job for it. Next time, give every dollar a job: save it, invest it, give it, or plan something fun.`));
@@ -432,12 +472,13 @@ const UI = (() => {
       p.appendChild(title("Run, grab, dodge, decide!"));
       const grid = el("div", "howto-grid");
       const how = (e, t) => { const d = el("div", "how"); d.appendChild(el("span", "he", e)); d.appendChild(rich("span", null, t)); grid.appendChild(d); };
-      how("🪙", "*Coins (25¢) and $1 bills* go in your wallet. Grab 20 in a row for a streak bonus.");
+      how("🪙", "*Coins (25¢) and $1 bills* go in your wallet. Every 5 in a row, coins grow 10%. Miss one or hit a trap and the streak resets.");
       how("🛒", "*BUY NOW carts* are impulse buys. Jump over them or they take money from your wallet.");
       how("👾", "*Scam pop-ups* cost money AND a heart. You can't jump them, so switch lanes!");
       how("❓", "*Quiz gates*: read the question, then run through the lane with the right answer.");
       how("🛡️", "*Emergency fund* blocks one trap. *x2* doubles coins. *Magnet* pulls coins in.");
       how("💰", "*Payday* comes 5 times per world: your allowance, interest, and a big money choice.");
+      how("⚡", "*Final rush* ends every world: gold coins in one lane, traps in the others. No hits = +$5!");
       p.appendChild(grid);
       p.appendChild(rich("p", "keys", "Keys: *▲ ▼* or *W S* switch lanes · *Space* jumps · *P* pauses · *1 2 3* pick choices · *M* mutes. On a phone or tablet: swipe up or down, tap to jump."));
       const acts = el("div", "p-actions");
@@ -497,7 +538,7 @@ const UI = (() => {
     show("screen-game");
     Render.resize();
     S.py = laneY(1);
-    prev = {}; lastPowers = "";
+    prev = {}; lastPowers = ""; lastTrip = null;
     banner(null); countdown("");
     hud();
     if (musicWanted) Sfx.setMusic(true, 0);
@@ -512,7 +553,7 @@ const UI = (() => {
     $("btn-play").focus();
   }
 
-  return { hud, tick, toast, banner, countdown, showPlan, showPayday, showClear, showShop, showPause, showEnd,
+  return { hud, tick, toast, streakUp, rush, banner, countdown, showPlan, showPayday, showClear, showShop, showPause, showEnd,
            showHowTo, showBadges, startGame, setSound, buildTitle, get keyChoices() { return keyChoices; },
            get musicWanted() { return musicWanted; }, setMusic, prefs: pref };
 })();

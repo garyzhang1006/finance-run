@@ -39,7 +39,7 @@
     <button class="btn btn-go" id="btn-play">Let's run! ▶</button>
     <div class="title-row">
       <button class="btn btn-small" id="btn-howto">❓ How to play</button>
-      <button class="btn btn-small" id="btn-badges">🏅 Badges <span id="badge-count">0/12</span></button>
+      <button class="btn btn-small" id="btn-badges">🏅 Badges <span id="badge-count">0/13</span></button>
       <button class="btn btn-small" id="btn-sound" aria-pressed="true">🔊 Sound</button>
     </div>
     <p class="best" id="best"></p>
@@ -64,6 +64,7 @@
         <b id="h-goal-text">$0 / $120</b>
       </div>
       <div class="hud-right">
+        <span class="chip streak" id="c-streak" hidden title="Coin streak: every 5 coins in a row, coins are worth 10% more. Missing a coin or hitting a trap resets it."><span class="ic">🔥</span><b id="h-streak">0</b><small id="h-mult"></small></span>
         <span class="hearts" id="h-hearts" role="img" aria-label="3 hearts"></span>
         <span class="chip joy" title="Joy: money is for living too!"><span class="ic" id="h-joy-ic">😊</span><b id="h-joy">60</b></span>
         <button class="icon-btn" id="btn-pause" aria-label="Pause">⏸</button>
@@ -72,7 +73,7 @@
 
     <div class="trip">
       <span class="trip-label" id="trip-label">Allowance Alley · Payday 1 of 5</span>
-      <div class="tripbar"><i id="trip-fill"></i><span class="gate-mark">❓</span><span class="pay-mark">💰</span></div>
+      <div class="tripbar"><i id="trip-fill"></i><span class="gate-mark" id="gate-mark">❓</span><span class="rush-mark" id="rush-mark" hidden>⚡</span><span class="pay-mark">💰</span></div>
     </div>
     <div class="powers" id="powers" aria-live="polite"></div>
     <div class="banner" id="banner" aria-live="polite"></div>

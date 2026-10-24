@@ -137,19 +137,21 @@ const Render = (() => {
   }
 
   /* ---------- entities ---------- */
-  function coin(x, y, t, phase, big) {
-    const r = big ? 18 : 15, sq = Math.abs(Math.cos(t * 5 + phase)) * 0.75 + 0.25;
+  function coin(x, y, t, phase, gold) {
+    const r = gold ? 19 : 15, sq = Math.abs(Math.cos(t * 5 + phase)) * 0.75 + 0.25;
+    if (gold) { cx.fillStyle = "rgba(255,216,77,.4)"; cx.beginPath(); cx.arc(x, y, r + 9 + Math.sin(t * 8 + phase) * 3, 0, 7); cx.fill(); }
     cx.save(); cx.translate(x, y); cx.scale(sq, 1);
-    cx.fillStyle = "#ffd84d"; cx.beginPath(); cx.arc(0, 0, r, 0, 7); cx.fill(); outline(4);
-    cx.fillStyle = "#ffb703"; cx.beginPath(); cx.arc(0, 0, r - 6, 0, 7); cx.fill();
+    cx.fillStyle = gold ? "#ffe680" : "#ffd84d"; cx.beginPath(); cx.arc(0, 0, r, 0, 7); cx.fill(); outline(4);
+    cx.fillStyle = gold ? "#ff9f1c" : "#ffb703"; cx.beginPath(); cx.arc(0, 0, r - 6, 0, 7); cx.fill();
     cx.restore();
     if (sq > 0.6) text("$", x, y + 1, 16, "#fff6db", 0);
   }
   function drawEnt(e, sx, t) {
     const y = laneY(e.lane), bob = reducedMotion ? 0 : Math.sin(t * 4 + e.wx * 0.01) * 4;
     if (e.k === "coin") {
-      if (e.air) { cx.fillStyle = "rgba(255,255,255,.45)"; cx.beginPath(); cx.arc(sx, y - 54 + bob, 22, 0, 7); cx.fill(); }
-      return coin(sx, y - (e.air ? 54 : 6) + bob, t, e.wx * 0.03);
+      // air coins float above a cart's sale sign so the sign stays readable
+      if (e.air) { cx.fillStyle = "rgba(255,255,255,.45)"; cx.beginPath(); cx.arc(sx, y - 78 + bob, 22, 0, 7); cx.fill(); }
+      return coin(sx, y - (e.air ? 78 : 6) + bob, t, e.wx * 0.03, e.gold);
     }
     if (e.k === "cash") {
       cx.save(); cx.translate(sx, y - 8 + bob); cx.rotate(Math.sin(t * 3 + e.wx) * 0.15);
@@ -209,6 +211,16 @@ const Render = (() => {
     const run = reducedMotion || S.mode !== "run" ? 0 : t * 14;
     cx.fillStyle = "rgba(43,29,92,.28)";
     cx.beginPath(); cx.ellipse(x, ground, 26 * (1 - h / 220), 7, 0, 0, 7); cx.fill();
+    // streak flames grow with each compounding tier
+    const tier = S.mode === "run" ? streakTier() : 0;
+    if (tier >= 2 && !reducedMotion) {
+      const cols = ["#ffd84d", "#ff9f1c", "#ff5a5f"];
+      for (let i = 0; i < 3; i++) {
+        cx.globalAlpha = 0.6 - i * 0.15; cx.fillStyle = cols[i];
+        cx.beginPath(); cx.ellipse(x - 36 - i * 16, y - 14 + Math.sin(t * 20 + i * 2) * 3, 12 + tier * 2 - i * 3, 9 - i * 2, 0, 0, 7); cx.fill();
+      }
+      cx.globalAlpha = 1;
+    }
     if (S.invuln > 0 && !reducedMotion && Math.sin(t * 40) > 0) return;
     cx.save(); cx.translate(x, y);
     cx.lineCap = "round"; cx.strokeStyle = INK; cx.lineWidth = 9;
@@ -252,6 +264,24 @@ const Render = (() => {
     }
   }
 
+  /* final rush start arch and checkered finish line */
+  function rushMarks(R) {
+    const top = trackTop(), bot = laneY(2) + 42;
+    const a = G.PX + (R.start - 260 - S.dist);
+    if (a > -100 && a < G.LW + 120) {
+      cx.fillStyle = INK; cx.fillRect(a - 3, top - 70, 6, bot - top + 70);
+      cx.fillStyle = "#ffd84d"; rr(a - 86, top - 98, 172, 36, 10); cx.fill(); outline(3);
+      text("⚡ FINAL RUSH", a, top - 80, 19, INK, 0);
+    }
+    const f = G.PX + (R.end - S.dist), sq = 14;
+    if (f > -60 && f < G.LW + 120) {
+      for (let yy = top + 4, r = 0; yy < bot; yy += sq, r++) for (let c = 0; c < 2; c++) { cx.fillStyle = (r + c) % 2 ? INK : "#fff"; cx.fillRect(f - sq + c * sq, yy, sq, Math.min(sq, bot - yy)); }
+      cx.fillStyle = INK; cx.fillRect(f - 3, top - 70, 6, 70);
+      cx.fillStyle = "#2ee59d"; rr(f - 58, top - 98, 116, 36, 10); cx.fill(); outline(3);
+      text("FINISH", f, top - 80, 19, INK, 0);
+    }
+  }
+
   /* ---------- effects ---------- */
   function stepFx(dt) {
     for (const f of fx) {
@@ -282,9 +312,11 @@ const Render = (() => {
       S.shake = live ? S.shake * Math.pow(0.02, dt) : S.shake; if (S.shake < 0.4) S.shake = 0;
     }
     drawWorld(THEMES[S.world] || THEMES[0], S.dist || 0, t);
-    if (S.x2 > 0 && !reducedMotion) {
-      cx.strokeStyle = "rgba(255,255,255,.55)"; cx.lineWidth = 3;
-      for (let i = 0; i < 9; i++) { const yy = hash(i + Math.floor(t * 12)) * G.LH, xx = hash(i * 3 + Math.floor(t * 12)) * G.LW; cx.beginPath(); cx.moveTo(xx, yy); cx.lineTo(xx + 70, yy); cx.stroke(); }
+    if (S.rush) rushMarks(S.rush);
+    const rushing = rushLive();
+    if ((S.x2 > 0 || rushing) && !reducedMotion) {
+      cx.strokeStyle = rushing ? "rgba(255,216,77,.75)" : "rgba(255,255,255,.55)"; cx.lineWidth = rushing ? 4 : 3;
+      for (let i = 0; i < (rushing ? 14 : 9); i++) { const yy = hash(i + Math.floor(t * 12)) * G.LH, xx = hash(i * 3 + Math.floor(t * 12)) * G.LW; cx.beginPath(); cx.moveTo(xx, yy); cx.lineTo(xx + 70, yy); cx.stroke(); }
     }
     const ents = S.ents || [];
     for (let lane = 0; lane < 3; lane++) {

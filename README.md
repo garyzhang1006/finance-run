@@ -1,6 +1,6 @@
 # Finance Run: Money Quest
 
-A free browser runner that teaches kids (around ages 8 to 12) how money works. You dash through four worlds grabbing coins, jump over BUY NOW carts, dodge scam pop-ups, run through the right lane at quiz gates, and make a real money choice at every payday while saving up for a goal you picked.
+A free browser runner that teaches kids (around ages 8 to 12) how money works. You dash through four worlds grabbing coins, jump over BUY NOW carts, dodge scam pop-ups, run through the right lane at quiz gates, and make a real money choice at every payday while saving up for a goal you picked. Every world ends in a final rush: a faster stretch with gold coins in one lane and that world's traps in the others.
 
 ## Play
 
@@ -31,6 +31,8 @@ Each world has its own money rule, five payday decisions, and a bank of quiz-gat
 
 The mechanics carry the lessons too:
 
+- **Compound streak.** Every 5 coins in a row, coins are worth 10% more (25¢, then 28¢, then 30¢, up to about double). Missing a coin in your lane or hitting a trap resets it, the same way pulling money out stops it from compounding.
+- **Final rush.** Each world's last payday stretch ends with waves of its traps and 50¢ gold coins in the one safe lane. Rush traps cost money but never hearts, and a rush with no hits pays a $5 bonus.
 - **Wallet vs. savings.** Coins land in your wallet, where impulse carts and scams can take a bite (the more you carry, the bigger the bite). Savings are safe.
 - **Saving plan.** At the start of each world you choose 10%, 25%, or 50% of everything you earn to move into savings automatically at payday.
 - **Interest.** Open a bank account in World 1 and your savings earn interest every payday, compounding as you go. Game rates are super-sized (3% to 5% per payday) so kids can watch it work, and the game says so.
@@ -38,7 +40,7 @@ The mechanics carry the lessons too:
 - **Joy.** Fun fades a little every payday, so saving every cent has a cost and the best grades go to balanced players.
 - **Shop.** Between worlds, every item shows its opportunity cost: what that money would grow to if you saved it instead.
 
-At the end, a report card grades your goal progress, joy, quiz score, hearts, and debt, and lists the money rules you practiced. Twelve badges (Scam Spotter, Compound Champ, Debt Free, and more) stay unlocked between runs.
+At the end, a report card grades your goal progress, joy, quiz score, hearts, and debt, and lists the money rules you practiced. Thirteen badges (Scam Spotter, Compound Champ, Debt Free, Rush Master, and more) stay unlocked between runs.
 
 ## Technical notes
 
@@ -61,7 +63,7 @@ Money is stored in whole cents so interest never drifts. Game speed is frame-rat
 
 ## Tests
 
-`tests/index.html` runs 22 regression checks against the real game in an iframe: money math at payday, debt and borrowing, every decision card's money adding up, frame-rate independence, blocked storage, lane alignment, pause, quiz gates, traps, the shop, and a full 4-world run. Browsers block file-to-file iframe access, so serve the folder first:
+`tests/index.html` runs 27 regression checks against the real game in an iframe: money math at payday, debt and borrowing, every decision card's money adding up, frame-rate independence, blocked storage, lane alignment, pause, quiz gates, traps, the shop, the coin streak, the final rush layout and bonus, and a full 4-world run. The last check is a seeded random-input fuzz run through menus, the shop, pause, and four full runs that fails on any negative or fractional balance, impossible hearts or joy, or a panel left open mid-run. Browsers block file-to-file iframe access, so serve the folder first:
 
 ```bash
 python3 -m http.server 8000

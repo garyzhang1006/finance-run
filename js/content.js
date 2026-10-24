@@ -22,6 +22,8 @@
      gave     dollars given to others (for the Big Heart badge)
      shield   +1 emergency-fund shield
      hearts   +/- hearts
+   Each world's last payday stretch ends in a final rush: waves of that
+   world's traps ("cart" or "scam") with gold coins in the one safe lane.
    A choice is locked when its cost is more than you have. Every card keeps
    at least one free choice so a broke player is never stuck.
    ================================================================= */
@@ -44,6 +46,7 @@ const WORLDS = [
   rule: "Needs first. Pay yourself first.",
   intro: "You get an allowance every payday. Grab coins, dodge the BUY NOW carts, and decide where your money goes.",
   income: 10,
+  rush: { name: "Mega Sale Stampede", tip: "Jump the carts or switch lanes. Keep your gold!", threats: ["cart", "cart"] },
   cards: [
    { emoji: "💵", t: "Bonus cash!",
      b: "You earned an extra $10 for helping clean the garage. The candy shop is right there, glowing.",
@@ -112,6 +115,7 @@ const WORLDS = [
   rule: "Profit = money in minus money out.",
   intro: "Time to earn! You run a lemonade stand by the docks. Smart business choices can raise your income for the rest of the run.",
   income: 10,
+  rush: { name: "Rush Hour at the Docks", tip: "Grab the gold, skip the 'guaranteed' deals!", threats: ["cart", "scam"] },
   cards: [
    { emoji: "🍋", t: "Lemonade stand: set your price",
      b: "Lemons, sugar, and cups cost $8. Mom pays for them and you pay her back from sales. What do you charge per cup?",
@@ -180,6 +184,7 @@ const WORLDS = [
   rule: "Saved money grows. Time makes it grow faster.",
   intro: "On this island, money grows on trees. Well, kind of. Learn how interest and investing make money bigger while you sleep.",
   income: 10,
+  rush: { name: "Compound Coast", tip: "Every gold coin grows your streak. Don't break it!", threats: ["cart", "cart"] },
   cards: [
    { emoji: "🏦", t: "The island bank's offer",
      b: "Island Bank offers a savings account that pays 5% every payday. Compare that with what your savings earn now.",
@@ -212,7 +217,7 @@ const WORLDS = [
         x: "A mountain of chocolate that might melt first! Stocking up isn't the fix. *Letting savings grow* is the better way to beat inflation." }
      ] },
    { emoji: "📈", t: "Own a piece of a company",
-     b: "You can buy a tiny piece of ONE company (a stock), or an index fund that owns a little bit of hundreds of companies.",
+     b: "A stock is a tiny piece of ONE company. An index fund owns tiny pieces of hundreds of companies. Which do you buy?",
      c: [
       { l: "$10 on one trendy company", e: { invest: 10, risk: "high" }, tag: "Risk",
         x: "One company can soar or crash. Putting *all your eggs in one basket* is risky! Watch your 📈 number swing at each payday." },
@@ -248,6 +253,7 @@ const WORLDS = [
   rule: "Borrowing costs money. Protect what you have.",
   intro: "A sneak peek at grown-up money: borrowing, budgets, taxes, and the trickiest scams yet. Final world, fastest traps!",
   income: 10,
+  rush: { name: "Scam Swarm", tip: "Pop-ups everywhere! Each one bites your wallet. Find the safe lane.", threats: ["scam", "cart"] },
   cards: [
    { emoji: "🙋", t: "Borrow from your big sister?",
      b: "You want a $20 game right now. Your sister will lend you the money, but you have to pay her back $25.",
@@ -342,11 +348,12 @@ const BADGES = [
   { id: "investor", emoji: "📈", name: "Investor",       how: "Finish holding investments" },
   { id: "untouch",  emoji: "🦸", name: "Untouchable",    how: "Finish all 4 worlds with 3 hearts" },
   { id: "goal",     emoji: "🏆", name: "Goal Getter",    how: "Reach your savings goal" },
-  { id: "balance",  emoji: "😊", name: "Happy & Wealthy", how: "Reach your goal with joy at 70+" }
+  { id: "balance",  emoji: "😊", name: "Happy & Wealthy", how: "Reach your goal with joy at 70+" },
+  { id: "rush",     emoji: "⚡", name: "Rush Master",    how: "Finish a final rush without getting hit" }
 ];
 
 const TIPS = [
-  "Kids who save a little every week build the habit that grown-ups wish they had started early.",
+  "Saving a little every week builds a habit most grown-ups wish they had started as kids.",
   "If $1 earns 10% a year, it doubles in about 7 years. That's compound interest.",
   "Real banks pay about 1% to 5% interest per year. This game super-sizes it so you can see it.",
   "Ads are built to make you want things. Ask: do I need it, or do I want it right now?",

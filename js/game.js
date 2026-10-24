@@ -26,6 +26,10 @@ const STRETCH_LEN = 3800;     // logical px of road between paydays
 const JUMP_DUR = 0.56, JUMP_H = 84;
 const GATE_WARN = 1500;       // logical px before a quiz gate when the question appears
 const DEBT_RATE = 0.10;       // per payday, deliberately harsh so the lesson shows
+const RUSH_LEN = 2000;        // extra road on each world's last stretch for the final rush
+const RUSH_BONUS = 500;       // cents for a rush with no hits
+const RUSH_WAVE = 330;        // road length of one rush wave
+const STREAK_STEP = 5, STREAK_GROWTH = 0.1, STREAK_TIERS = 8;
 const POWERS = ["shield", "x2", "magnet"];
 const CART_LABELS = ["SALE!", "BUY NOW", "50% OFF", "LIMITED!", "NEW!"];
 const SCAM_LABELS = ["FREE GEMZ", "YOU WON!", "2X MONEY", "CLICK ME", "FREE $$$"];
@@ -55,16 +59,22 @@ function newRun(goal, runner) {
     gave: 0, interestEarned: 0, coinsTotal: 0, stretchCoins: 0,
     quizRight: 0, quizTotal: 0, worldQuizRight: 0, scamsDodged: 0, trapsHit: 0,
     combo: 0, bestCombo: 0, rebound: false, tags: [], worldStars: [], worldSavingsStart: 0,
-    dist: 0, stretchStart: 0, cursor: 0, speed: 330,
+    rushesRun: 0, perfectRushes: 0, streakTold: false,
+    dist: 0, stretchStart: 0, stretchLen: STRETCH_LEN, cursor: 0, speed: 330, rush: null,
     lane: 1, py: 0, jumpT: 0, invuln: 0, x2: 0, magnet: 0,
     ents: [], gate: null, countdown: 0, t: 0, shake: 0, hudDirty: true
   });
   S.py = laneY(1);
+  Sfx.setRush(false);
 }
 
 const income = () => cents(WORLDS[S.world].income) + S.incomeBonus;
 const netWorth = () => S.wallet + S.savings + S.invest - S.debt;
 const goalFund = () => S.savings + S.invest;
+/* a coin streak compounds: every 5 coins in a row, coins are worth 10% more until a trap resets it */
+const streakTier = () => Math.min(STREAK_TIERS, Math.floor(S.combo / STREAK_STEP));
+const streakMult = () => Math.pow(1 + STREAK_GROWTH, streakTier());
+const rushLive = () => !!(S.rush && S.rush.announced && !S.rush.done);
 const jumpH = () => S.jumpT > 0 ? Math.sin(Math.PI * (1 - S.jumpT / JUMP_DUR)) * JUMP_H : 0;
 const dirty = () => { S.hudDirty = true; };
 
@@ -79,7 +89,9 @@ function beginWorld(saveRate) {
 }
 
 function beginStretch(count) {
+  const finale = S.stretch === STRETCHES - 1;
   S.stretchStart = S.dist;
+  S.stretchLen = STRETCH_LEN + (finale ? RUSH_LEN : 0);
   S.cursor = S.dist + 520;
   S.ents = [];
   S.stretchCoins = 0;
@@ -97,6 +109,11 @@ function beginStretch(count) {
     done: false, shown: false
   };
   S.ents.push(S.gate);
+  S.rush = finale ? Object.assign({}, WORLDS[S.world].rush, {
+    start: S.gate.wx + 900, end: S.stretchStart + S.stretchLen - 420,
+    waves: 0, hits: 0, gold: 0, safe: 1, announced: false, done: false
+  }) : null;
+  Sfx.setRush(false);
   S.countdown = count;
   S.mode = "countdown";
   UI.banner(null);
@@ -105,11 +122,18 @@ function beginStretch(count) {
 
 /* ---------- spawning: patterns laid out in road distance ---------- */
 function spawnAhead() {
-  const stretchEnd = S.stretchStart + STRETCH_LEN;
+  const stretchEnd = S.stretchStart + S.stretchLen, R = S.rush;
   while (S.cursor < S.dist + G.LW + 140) {
     const gx = S.gate ? S.gate.wx : -1e9;
     if (S.cursor > gx - 560 && S.cursor < gx + 280) { S.cursor = gx + 280; continue; }
     if (S.cursor > stretchEnd - 380) { S.cursor = Infinity; break; }
+    // regular patterns stop early enough that none overlap the first rush wave,
+    // and a wave only starts if all of it fits before the finish line
+    if (R && S.cursor >= R.start - 520) {
+      S.cursor = Math.max(S.cursor, R.start);
+      S.cursor = S.cursor + RUSH_WAVE <= R.end ? S.cursor + layRushWave(S.cursor) : Infinity;
+      continue;
+    }
     S.cursor += layPattern(S.cursor) + rand(150, 300) - Math.min(90, (S.world * 5 + S.stretch) * 5);
   }
 }
@@ -165,6 +189,21 @@ function layPattern(x) {
   return 200;
 }
 
+/* final rush: the world's traps block two lanes, gold coins fill the third.
+   The safe lane moves at most one lane per wave so it is always reachable.
+   Rush traps cost money but never hearts, so a run can't be lost at the finish. */
+function layRushWave(x) {
+  const R = S.rush;
+  if (R.waves > 0) R.safe = clamp(R.safe + pickOne([-1, 0, 1]), 0, 2);
+  otherLanes(R.safe).forEach((l, i) => {
+    const k = R.threats[i % R.threats.length];
+    add(k, x + 60, l, { label: pickOne(k === "cart" ? CART_LABELS : SCAM_LABELS), rush: true });
+  });
+  for (let i = 0; i < 3; i++) add("coin", x + i * 56, R.safe, { gold: true });
+  R.waves++;
+  return RUSH_WAVE;
+}
+
 /* ---------- per-frame update ---------- */
 function update(dt) {
   if (S.mode === "countdown") {
@@ -182,7 +221,12 @@ function update(dt) {
   const g = S.gate, gateSx = g && !g.done ? G.PX + (g.wx - S.dist) : Infinity;
   const nearGate = gateSx - G.PX < GATE_WARN && gateSx > G.PX - 40;
   if (nearGate && !g.shown) { g.shown = true; UI.banner(g); Sfx.play("power"); }
-  const v = S.speed * G.speedScale * (nearGate ? 0.7 : 1);
+  const R = S.rush;
+  if (R && !R.announced && S.dist >= R.start - 700) {
+    R.announced = true; S.rushesRun++;
+    Sfx.play("rush"); Sfx.setRush(true); UI.rush(R);
+  }
+  const v = S.speed * G.speedScale * (nearGate ? 0.7 : rushLive() ? 1.15 : 1);
   S.dist += v * dt;
 
   const ty = laneY(S.lane);
@@ -197,7 +241,8 @@ function update(dt) {
   // answered gates stay on screen so the player sees which sign was right
   S.ents = S.ents.filter(e => (e.k === "gate" || !e.done) && G.PX + (e.wx - S.dist) > -120);
 
-  if (S.mode === "run" && S.dist >= S.stretchStart + STRETCH_LEN) payday();
+  if (S.mode === "run" && rushLive() && S.dist >= R.end) finishRush();
+  if (S.mode === "run" && S.dist >= S.stretchStart + S.stretchLen) payday();
 }
 
 function collide() {
@@ -211,6 +256,8 @@ function collide() {
       if (S.magnet > 0 && sx > G.PX - 10 && sx < G.PX + 320) { grab(e, sx, true); continue; }
       const heightOk = e.air ? h > 34 : h < 52;
       if (e.lane === S.lane && dx < 30 && heightOk) grab(e, sx, false);
+      // running past a coin in your own lane breaks the streak; coins in other lanes don't count
+      else if (!e.missed && e.lane === S.lane && sx < G.PX - 32) { e.missed = true; breakStreak(); }
       continue;
     }
     if (e.k === "power") { if (e.lane === S.lane && dx < 34) power(e, sx); continue; }
@@ -224,19 +271,26 @@ function collide() {
 
 function grab(e, sx, magnet) {
   e.done = true;
-  const y = laneY(e.lane) - (e.air ? 50 : 0);
-  let val = e.k === "cash" ? 100 : 25;   // quarters and $1 bills: allowance is the main income, like real life
+  const y = laneY(e.lane) - (e.air ? 78 : 0);
+  // quarters and $1 bills: allowance is the main income, like real life. Rush gold is 50 cents.
+  let val = e.k === "cash" ? 100 : e.gold ? 50 : 25;
   if (S.x2 > 0) val *= 2;
+  const tierBefore = streakTier();
   S.combo++; S.bestCombo = Math.max(S.bestCombo, S.combo);
+  val = Math.round(val * streakMult());
   S.wallet += val; S.stretchCoins += val; S.coinsTotal += val;
-  Render.float(sx, y - 20, val < 100 ? `+${val}¢` : "+" + fmt(val), e.k === "cash" ? "#2ee59d" : "#ffd84d");
-  Render.burst(sx, y, e.k === "cash" ? "#2ee59d" : "#ffd84d", magnet ? 4 : 7);
+  if (e.gold && S.rush) S.rush.gold += val;
+  const col = e.k === "cash" ? "#2ee59d" : "#ffd84d";
+  Render.float(sx, y - 20, val < 100 ? `+${val}¢` : "+" + fmt(val), col);
+  Render.burst(sx, y, col, magnet ? 4 : e.gold ? 10 : 7);
   Sfx.play(e.k === "cash" ? "cash" : "coin", S.combo);
-  if (S.combo % 20 === 0) {
-    S.wallet += 100; S.stretchCoins += 100; S.coinsTotal += 100;
-    UI.toast(`🔥 ${S.combo}-coin streak! +$1 bonus`, "good");
-    Sfx.play("power");
-  }
+  if (streakTier() > tierBefore) UI.streakUp(streakTier());
+  dirty();
+}
+
+function breakStreak() {
+  if (S.combo >= STREAK_STEP && !reducedMotion) Render.float(G.PX, S.py - 70, "streak lost", "#ff9f1c");
+  S.combo = 0;
   dirty();
 }
 
@@ -263,6 +317,7 @@ function hit(e, sx) {
     dirty(); return;
   }
   S.trapsHit++; S.invuln = 1.1;
+  if (rushLive()) S.rush.hits++;
   S.shake = reducedMotion ? 0 : (e.k === "scam" ? 14 : 9);
   if (e.k === "cart") {
     const cost = Math.min(S.wallet, Math.max(cents(2 + S.world * 0.5), Math.round(S.wallet * 0.12)));
@@ -274,9 +329,10 @@ function hit(e, sx) {
       : `🛒 Impulse buy! -${fmt(cost)}`, "bad");
   } else {
     const cost = Math.min(S.wallet, Math.max(cents(4 + S.world), Math.round(S.wallet * 0.2)));
-    S.wallet -= cost; S.hearts--;
+    S.wallet -= cost;
+    if (!e.rush) S.hearts--;
     Sfx.play("scam");
-    Render.float(sx, y - 30, "-❤️" + (cost ? " -" + fmt(cost) : ""), "#ff5a5f");
+    Render.float(sx, y - 30, (e.rush ? "" : "-❤️ ") + (cost ? "-" + fmt(cost) : "$0 left!"), "#ff5a5f");
     UI.toast(pickOne(SCAM_LESSONS), "bad");
     if (S.hearts <= 0) { dirty(); endRun("hearts"); return; }
   }
@@ -298,6 +354,22 @@ function resolveGate(g) {
     S.combo = 0;
     Sfx.play("wrong");
     UI.banner(g, false, `❌ It was "${g.answers[g.okLane]}". ${g.why}`);
+  }
+  dirty();
+}
+
+function finishRush() {
+  const R = S.rush;
+  R.done = true;
+  Sfx.setRush(false);
+  if (R.hits === 0) {
+    S.perfectRushes++;
+    S.wallet += RUSH_BONUS; S.stretchCoins += RUSH_BONUS; S.coinsTotal += RUSH_BONUS;
+    Sfx.play("right"); Render.confetti(G.PX, S.py);
+    UI.toast(`🏆 PERFECT RUSH! +${fmt(RUSH_BONUS)} bonus`, "good", 2600);
+  } else {
+    Sfx.play("payday");
+    UI.toast(R.gold ? `⚡ Rush done! +${fmt(R.gold)} in gold` : "⚡ Rush done! Next time, grab the gold in the safe lane", "good", 2600);
   }
   dirty();
 }
@@ -445,6 +517,7 @@ function earnedBadges(finished) {
   if (S.interestEarned >= cents(15)) out.push("compound");
   if (S.gave >= cents(10)) out.push("heart");
   if (S.bestCombo >= 40) out.push("streak");
+  if (S.perfectRushes > 0) out.push("rush");
   if (finished && S.debt === 0) out.push("debtfree");
   if (income() >= cents(16)) out.push("boss");
   if (S.invest > 0) out.push("investor");
@@ -458,6 +531,7 @@ function endRun(reason) {
   if (S.mode === "end") return;
   const finished = reason === "done";
   S.mode = "end";
+  Sfx.setRush(false);
   UI.banner(null);
   const grade = gradeRun(finished);
   const badges = earnedBadges(finished);

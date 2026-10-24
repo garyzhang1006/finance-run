@@ -7,7 +7,7 @@
 const Sfx = (() => {
   let ac = null, master = null, musicGain = null;
   let sfxOn = true, musicOn = true;
-  let musicTimer = null, nextNoteT = 0, step = 0, root = 0;
+  let musicTimer = null, nextNoteT = 0, step = 0, root = 0, rush = false;
 
   function ensure() {
     if (ac) { if (ac.state === "suspended") ac.resume(); return true; }
@@ -59,20 +59,22 @@ const Sfx = (() => {
     clear: () => seq([523, 523, 784, 784, 880, 1047, 1319, 1568], 0.09, { vol: 0.13 }),
     lose:  () => seq([392, 370, 349, 330, 262], 0.16, { type: "triangle", vol: 0.2 }),
     tick:  () => tone(1000, 0.05, { vol: 0.1 }),
+    star:  () => seq([988, 1319, 1976], 0.05, { type: "triangle", vol: 0.18 }),
+    rush:  () => { seq([392, 523, 659, 784, 1047, 1319, 1568], 0.045, { vol: 0.13 }); noise(0.4, 0.08); },
     go:    () => seq([784, 1568], 0.08, { vol: 0.14 })
   };
 
-  /* tiny 16-step chiptune loop; root shifts per world */
+  /* tiny 16-step chiptune loop; root shifts per world, tempo and lead pick up during a final rush */
   const LEAD = [0, null, 7, null, 12, null, 7, 9, 0, null, 7, null, 14, 12, 9, 7];
   const BASS = [0, 0, null, 0, -5, null, -5, null, -3, -3, null, -3, -5, null, -7, null];
   const hz = semi => 261.63 * Math.pow(2, semi / 12);
   function schedule() {
     if (!ac || !musicOn) return;
-    const spb = 60 / 132 / 2; // eighth notes at 132 bpm
+    const spb = 60 / (rush ? 168 : 132) / 2; // eighth notes
     while (nextNoteT < ac.currentTime + 0.15) {
       const at = nextNoteT - ac.currentTime;
       const l = LEAD[step % 16], b = BASS[step % 16];
-      if (l != null && (step >> 4) % 2 === 1) tone(hz(root + l + 12), spb * 0.9, { vol: 0.5, at: Math.max(0, at), out: musicGain });
+      if (l != null && (rush || (step >> 4) % 2 === 1)) tone(hz(root + l + 12), spb * 0.9, { vol: 0.5, at: Math.max(0, at), out: musicGain });
       if (b != null) tone(hz(root + b - 12), spb * 0.95, { type: "triangle", vol: 0.9, at: Math.max(0, at), out: musicGain });
       nextNoteT += spb; step++;
     }
@@ -88,6 +90,7 @@ const Sfx = (() => {
       musicTimer = setInterval(schedule, 50);
     },
     setRoot(world) { root = [0, 2, 5, -3][world] || 0; },
+    setRush(on) { rush = !!on; },
     stopMusic() { clearInterval(musicTimer); musicTimer = null; },
     get sfxOn() { return sfxOn; },
     get musicOn() { return musicOn; },
