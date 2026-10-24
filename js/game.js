@@ -15,10 +15,12 @@ const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pickOne = arr => arr[(Math.random() * arr.length) | 0];
 
-/* storage can throw (private mode, blocked cookies), so it never may crash the game */
+/* storage can throw (private mode, blocked cookies), so it never may crash the game;
+   a copy in memory keeps badges, best score, and the seen how-to for the rest of the visit */
+const memStore = {};
 const store = {
-  get(k, d) { try { const v = localStorage.getItem("fr2-" + k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } },
-  set(k, v) { try { localStorage.setItem("fr2-" + k, JSON.stringify(v)); } catch (_) { /* storage blocked */ } }
+  get(k, d) { try { const v = localStorage.getItem("fr2-" + k); return v == null ? d : JSON.parse(v); } catch (_) { return k in memStore ? memStore[k] : d; } },
+  set(k, v) { memStore[k] = v; try { localStorage.setItem("fr2-" + k, JSON.stringify(v)); } catch (_) { /* storage blocked */ } }
 };
 
 const STRETCHES = 5;          // paydays per world

@@ -89,16 +89,17 @@ test("Game speed is the same at 60 Hz and 120 Hz", async () => {
   })()`);
   ok(Math.abs(r[0] - r[1]) < 0.01, `distance in 1s: ${r[0]} at 60 Hz vs ${r[1]} at 120 Hz`);
 });
-test("Blocked storage can't crash the game", async () => {
+test("Blocked storage can't crash the game, and the visit still remembers the how-to and best score", async () => {
   await fresh();
   const r = run(`(() => {
     Storage.prototype.getItem = () => { throw new Error("blocked"); };
     Storage.prototype.setItem = () => { throw new Error("blocked"); };
     UI.buildTitle(); store.set("seenHow", true); UI.startGame(); beginWorld(0.25);
     S.hearts = 1; S.mode = "run"; endRun("hearts");
-    return [store.get("best", "fallback"), S.mode, !!document.querySelector("#panel .medal")];
+    return [store.get("nothing", "fallback"), store.get("seenHow", false), store.get("best", null) === netWorth(), S.mode, !!document.querySelector("#panel .medal")];
   })()`);
-  eq(r[0], "fallback", "store.get falls back"); eq(r[1], "end", "run still ends"); ok(r[2], "report card still shows");
+  eq(r[0], "fallback", "unknown keys fall back"); eq(r[1], true, "how-to stays seen"); ok(r[2], "best score kept");
+  eq(r[3], "end", "run still ends"); ok(r[4], "report card still shows");
 });
 test("Collision lanes match the lanes drawn on screen", async () => {
   await fresh(); startRun();
@@ -275,6 +276,85 @@ test("Payday tally shows interest as its own line", async () => {
     return [...document.querySelectorAll("#panel .tline")].map(d => d.textContent); })()`);
   ok(rows.some(t => t.includes("Interest") && t.endsWith("+$3")), "interest line: " + rows.join(" | "));
   ok(rows.some(t => t.includes("Coins") && t.endsWith("+$3")), "coins line");
+});
+test("Keyboard: arrows, W and S, Space, P, Escape, M, and number keys all work", async () => {
+  await fresh();
+  const r = run(`(() => {
+    const key = k => dispatchEvent(new KeyboardEvent("keydown", { key: k, cancelable: true }));
+    store.set("seenHow", true); UI.startGame(); key("3"); const started = S.mode;
+    S.countdown = 0; update(0.016); S.lane = 1; const out = [started];
+    key("ArrowDown"); out.push(S.lane); key("w"); out.push(S.lane); key("ArrowUp"); out.push(S.lane); key("s"); out.push(S.lane);
+    key(" "); out.push(S.jumpT > 0);
+    const snd = UI.prefs.sound; key("m"); out.push(UI.prefs.sound === !snd); key("M");
+    key("p"); out.push(S.mode); key("Escape"); out.push(S.mode);
+    return out; })()`);
+  eq(r.join(), "countdown,2,1,0,1,true,true,paused,countdown", "mode and lane after each key");
+});
+test("Swipes and taps on the track work, even under the turn-sideways hint", async () => {
+  await fresh();
+  const r = run(`(() => {
+    store.set("seenHow", true); UI.startGame(); UI.keyChoices[0](); S.countdown = 0; update(0.016);
+    S.mode = "run"; S.lane = 1; S.jumpT = 0;
+    const hint = document.querySelector(".rotate-hint"); hint.style.display = "block";
+    const h = hint.getBoundingClientRect(), x = h.left + h.width / 2, y = h.top + h.height / 2, at = document.elementFromPoint(x, y);
+    const ptr = (el, type, px, py) => el.dispatchEvent(new PointerEvent(type, { clientX: px, clientY: py, bubbles: true, cancelable: true }));
+    ptr(at, "pointerdown", x, y); ptr(at, "pointerup", x, y - 60); const swiped = S.lane;
+    ptr(at, "pointerdown", x, y); ptr(at, "pointerup", x, y); const tapped = S.jumpT > 0;
+    ptr(document.getElementById("t-down"), "pointerdown"); const down = S.lane;
+    ptr(document.getElementById("t-up"), "pointerdown"); const up = S.lane;
+    return [at.id, swiped, tapped, down, up]; })()`);
+  eq(r.join(), "stage,0,true,1,0", "element under the hint, lane after swipe up, tap jumps, touch buttons");
+});
+test("Title and pause menus: how-to, badges, sound, music, and quit to menu all work", async () => {
+  await fresh();
+  const r = run(`(() => {
+    const $ = id => document.getElementById(id), open = () => $("overlay").classList.contains("on"), out = [];
+    const panelBtn = t => [...document.querySelectorAll("#panel button")].find(b => b.textContent.includes(t));
+    $("btn-howto").click(); out.push(open() && /HOW TO PLAY/.test($("panel").textContent));
+    panelBtn("Got it").click(); out.push(!open());
+    $("btn-badges").click(); out.push($("panel").querySelectorAll(".badge").length === BADGES.length);
+    panelBtn("Back").click(); out.push(!open() && document.activeElement === $("btn-badges"));
+    const s = UI.prefs.sound; $("btn-sound").click(); out.push(UI.prefs.sound === !s); $("btn-sound").click();
+    $("btn-play").click(); out.push(open() && !!UI.keyChoices);
+    UI.keyChoices[0](); S.countdown = 0; update(0.016); togglePause(); out.push(S.mode);
+    const sb = panelBtn("Sound"), sOld = sb.textContent; sb.click(); out.push(sb.textContent !== sOld); sb.click();
+    const mb = panelBtn("Music"), mOld = mb.textContent; mb.click(); out.push(mb.textContent !== mOld); mb.click();
+    panelBtn("Quit to menu").click();
+    out.push(S.mode, !open(), $("screen-title").classList.contains("on"), document.activeElement === $("btn-play"));
+    return out; })()`);
+  eq(r.join(), "true,true,true,true,true,true,paused,true,true,title,true,true,true", "each menu step");
+});
+test("Title pickers save the runner and goal; a choice that costs the last heart ends the run", async () => {
+  await fresh();
+  const r = run(`(() => {
+    const $ = id => document.getElementById(id), runners = [...$("pick-runner").children], goals = [...$("pick-goal").children];
+    runners[2].click(); goals[1].click();
+    const out = [store.get("runner") === RUNNERS[2].id, store.get("goal") === GOALS[1].id, runners[2].getAttribute("aria-checked"), runners[0].getAttribute("aria-checked")];
+    store.set("seenHow", true); UI.startGame(); out.push(S.goal.id === GOALS[1].id);
+    UI.keyChoices[0](); S.countdown = 0; update(0.016);
+    let at = null;
+    WORLDS.forEach((wd, wi) => wd.cards.forEach((cd, ci) => cd.c.forEach((ch, k) => { if (!at && ch.e.hearts < 0) at = [wi, ci, k]; })));
+    Object.assign(S, { world: at[0], stretch: at[1], hearts: 1, wallet: 5000 }); payday();
+    UI.keyChoices[at[2]]();
+    const next = document.querySelector("#panel .lesson .btn-primary"); out.push(next.textContent.trim()); next.click();
+    out.push(S.mode, !!document.querySelector("#panel .medal"));
+    return out; })()`);
+  eq(r.join(), "true,true,true,false,true,See results,end,true", "picker and last-heart steps");
+});
+test("Every world draws every item, hat, power, and the rush gates without errors", async () => {
+  await fresh(); startRun();
+  const n = run(`(() => { let drawn = 0;
+    for (let wi = 0; wi < WORLDS.length; wi++) for (const hat of ["shades", "crown"]) {
+      Object.assign(S, { world: wi, hat, magnet: 5, x2: 5, shield: 1, combo: 17, invuln: 0 });
+      const d = S.dist + 200; S.ents = [];
+      add("coin", d, 0); add("coin", d + 50, 1, { gold: true }); add("coin", d + 100, 2, { air: true }); add("cash", d + 150, 0);
+      for (const p of ["shield", "x2", "magnet"]) add("power", d + 200, 1, { p });
+      add("cart", d + 300, 1, { label: "BUY NOW" }); add("scam", d + 360, 2, { label: "FREE GEMS" });
+      S.rush = { start: S.dist + 400, end: S.dist + 600, announced: true, done: false };
+      Render.draw(0.016); drawn++;
+    }
+    S.rush = null; return drawn; })()`);
+  eq(n, 8, "frames drawn");
 });
 
 /* ---------- random input fuzz ---------- */

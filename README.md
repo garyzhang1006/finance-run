@@ -63,7 +63,7 @@ Money is stored in whole cents so interest never drifts. Game speed is frame-rat
 
 ## Tests
 
-`tests/index.html` runs 27 regression checks against the real game in an iframe: money math at payday, debt and borrowing, every decision card's money adding up, frame-rate independence, blocked storage, lane alignment, pause, quiz gates, traps, the shop, the coin streak, the final rush layout and bonus, and a full 4-world run. The last check is a seeded random-input fuzz run through menus, the shop, pause, and four full runs that fails on any negative or fractional balance, impossible hearts or joy, or a panel left open mid-run. Browsers block file-to-file iframe access, so serve the folder first:
+`tests/index.html` runs 32 regression checks against the real game in an iframe: money math at payday, debt and borrowing, every decision card's money adding up, frame-rate independence, blocked storage, lane alignment, pause, quiz gates, traps, the shop, the coin streak, the final rush layout and bonus, keyboard keys, swipes and touch buttons, the title and pause menus, every world's drawing, and a full 4-world run. One check is a seeded random-input fuzz run through menus, the shop, pause, and four full runs that fails on any negative or fractional balance, impossible hearts or joy, or a panel left open mid-run. Browsers block file-to-file iframe access, so serve the folder first:
 
 ```bash
 python3 -m http.server 8000
