@@ -1,31 +1,62 @@
-# Finance Run
+# Finance Run: Money Quest
 
-A browser-based financial-literacy runner. Dodge bills and scams, collect cash and investments, then make a money decision at every payday. Survive three years without overdrafting.
+A free browser runner that teaches kids (around ages 8 to 12) how money works. You dash through four worlds grabbing coins, jump over BUY NOW carts, dodge scam pop-ups, run through the right lane at quiz gates, and make a real money choice at every payday while saving up for a goal you picked.
 
 ## Play
 
-No install or build step required. Open `index.html` in a modern browser.
+No install or build step. Open `index.html` in a modern browser, or serve the folder with any static host (GitHub Pages works as is).
 
 ## Controls
 
-- **Up / Down arrows** or **W / S**: switch lanes
-- **Tap upper or lower half of the game**: switch lanes on touch devices
-- **P**: pause or resume
-- **1, 2, 3**: choose a payday decision
+| Action | Keyboard | Touch |
+| --- | --- | --- |
+| Switch lanes | Up / Down or W / S | Swipe up or down, or the ▲ ▼ buttons |
+| Jump | Space | Tap the track, or the JUMP button |
+| Pick a choice | 1, 2, 3 | Tap |
+| Pause | P or Esc | ⏸ button |
+| Mute | M | Pause menu |
+
+The game pauses itself when the tab or window loses focus.
 
 ## What it teaches
 
-The game uses 36 payday decisions across three stages:
+Each world has its own money rule, five payday decisions, and a bank of quiz-gate questions.
 
-- **Year 1: First Job** — build a starter budget and credit habits.
-- **Year 2: Moved Out** — manage rent, recurring costs, and larger financial choices.
-- **Year 3: Big Money Era** — balance investing, lifestyle, and long-term goals.
+| World | Money rule | Topics |
+| --- | --- | --- |
+| 🏡 Allowance Alley | Needs first. Pay yourself first. | Needs vs. wants, impulse buys, wait-a-week rule, spend/save/give, where to keep savings |
+| 🍋 Hustle Harbor | Profit = money in minus money out. | Pricing, profit, income, reinvesting, opportunity cost, "guaranteed" deals |
+| 🌴 Interest Island | Saved money grows. Time makes it grow faster. | Interest, compound interest, inflation, stocks vs. index funds, staying calm in a market drop |
+| 🌃 Future City | Borrowing costs money. Protect what you have. | Borrowing and interest, debt payoff, budgeting, taxes, online scams |
 
-Choices affect cash, investments, debt, credit score, and vibes. Every decision ends with a short explanation of the financial principle behind it. At the end of a run, the receipt grades net worth, credit, and quality of life.
+The mechanics carry the lessons too:
+
+- **Wallet vs. savings.** Coins land in your wallet, where impulse carts and scams can take a bite (the more you carry, the bigger the bite). Savings are safe.
+- **Saving plan.** At the start of each world you choose 10%, 25%, or 50% of everything you earn to move into savings automatically at payday.
+- **Interest.** Open a bank account in World 1 and your savings earn interest every payday, compounding as you go. Game rates are super-sized (3% to 5% per payday) so kids can watch it work, and the game says so.
+- **Investments and debt.** Investments swing up and down each payday, more for one company than an index fund. Borrowed money grows 10% per payday until you pay it back.
+- **Joy.** Fun fades a little every payday, so saving every cent has a cost and the best grades go to balanced players.
+- **Shop.** Between worlds, every item shows its opportunity cost: what that money would grow to if you saved it instead.
+
+At the end, a report card grades your goal progress, joy, quiz score, hearts, and debt, and lists the money rules you practiced. Twelve badges (Scam Spotter, Compound Champ, Debt Free, and more) stay unlocked between runs.
 
 ## Technical notes
 
-Finance Run is a dependency-free single-page app. All HTML, CSS, and JavaScript live in `index.html`. High scores are stored only in the browser with `localStorage` under `fr-hiscore`; no data is sent to a server. The UI respects the browser's reduced-motion preference.
+Plain HTML, CSS, and JavaScript with no dependencies or build step.
+
+```
+index.html        screens and HUD markup
+css/style.css     all styling
+js/content.js     the curriculum: worlds, decision cards, quiz gates, shop, badges
+js/sfx.js         sound effects and music, synthesized with WebAudio (no audio files)
+js/game.js        game state, rules, spawning, collisions, paydays, grading
+js/render.js      canvas drawing
+js/ui.js          panels, HUD updates, input, and the main loop
+```
+
+To add or edit lessons, change `js/content.js`; the comment at the top lists every effect a choice can have. Each decision card keeps at least one free choice so a player with an empty wallet is never stuck.
+
+Money is stored in whole cents so interest never drifts. Game speed is frame-rate independent and scales with screen width so phones get the same reaction time as laptops. Best score, badges, and settings live in `localStorage` (wrapped so a blocked storage never crashes the game); nothing is sent to a server. Fonts load from Google Fonts with system fallbacks, and the game respects the reduced-motion setting.
 
 ## License
 
