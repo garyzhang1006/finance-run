@@ -176,7 +176,11 @@ const UI = (() => {
     const f = p.querySelector("[data-focus]") || p.querySelector("button:not(:disabled)");
     if (f) f.focus({ preventScroll: true });
   }
-  function closePanel() { $("overlay").classList.remove("on"); keyChoices = null; }
+  function closePanel() {
+    $("overlay").classList.remove("on"); keyChoices = null;
+    // a still-focused hidden button would eat the Space key meant for jumping
+    if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  }
   const tag = (t) => el("span", "p-tag", t);
   const title = (t) => { const h = el("h2", null, t); h.id = "panel-title"; return h; };
 

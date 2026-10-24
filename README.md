@@ -52,11 +52,22 @@ js/sfx.js         sound effects and music, synthesized with WebAudio (no audio f
 js/game.js        game state, rules, spawning, collisions, paydays, grading
 js/render.js      canvas drawing
 js/ui.js          panels, HUD updates, input, and the main loop
+tests/index.html  regression tests (see below)
 ```
 
 To add or edit lessons, change `js/content.js`; the comment at the top lists every effect a choice can have. Each decision card keeps at least one free choice so a player with an empty wallet is never stuck.
 
 Money is stored in whole cents so interest never drifts. Game speed is frame-rate independent and scales with screen width so phones get the same reaction time as laptops. Best score, badges, and settings live in `localStorage` (wrapped so a blocked storage never crashes the game); nothing is sent to a server. Fonts load from Google Fonts with system fallbacks, and the game respects the reduced-motion setting.
+
+## Tests
+
+`tests/index.html` runs 22 regression checks against the real game in an iframe: money math at payday, debt and borrowing, every decision card's money adding up, frame-rate independence, blocked storage, lane alignment, pause, quiz gates, traps, the shop, and a full 4-world run. Browsers block file-to-file iframe access, so serve the folder first:
+
+```bash
+python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000/tests/` and read the summary line at the top.
 
 ## License
 

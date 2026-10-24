@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance Run tests</title>
+<style>
+  body { font: 15px/1.4 ui-monospace, Menlo, monospace; margin: 16px; background: #fffaf0; color: #2b1d5c; }
+  h1 { font-size: 20px; }
+  #summary { font-weight: 700; margin: 8px 0 12px; }
+  .pass { color: #16a874; } .fail { color: #d62839; }
+  li { margin: 2px 0; }
+  iframe { width: 900px; height: 560px; border: 2px solid #2b1d5c; }
+</style>
+</head>
+<body>
+<h1>Finance Run regression tests</h1>
+<p>Serve the repo folder over http (for example <code>python3 -m http.server</code>) and open <code>/tests/</code>. Each test reloads the real game in the frame below and checks its state.</p>
+<div id="summary">Running...</div>
+<ol id="results"></ol>
+<iframe id="game" title="game under test"></iframe>
+<script>
+"use strict";
+const frame = document.getElementById("game");
+let w = null;
+
+/* load a fresh copy of the game; size lets a test shrink the viewport */
+function fresh(width = 900, height = 560) {
+  frame.style.width = width + "px"; frame.style.height = height + "px";
+  return new Promise(res => {
+    frame.onload = () => { w = frame.contentWindow; res(); };
+    frame.src = "../index.html?t=" + Date.now();
+  });
+}
+/* The game's globals are top-level const/let, which are visible to other classic
+   scripts in the frame but not as window properties, so each check runs as an
+   injected script and hands its result back through window.__t. */
+function run(expr) {
+  const d = frame.contentDocument, s = d.createElement("script");
+  s.textContent = `try { window.__t = { v: (${expr}) }; } catch (e) { window.__t = { err: String(e && e.stack || e) }; }`;
+  d.body.appendChild(s); s.remove();
+  const r = w.__t; w.__t = null;
+  if (!r) throw new Error("check did not run (syntax error?)");
+  if (r.err) throw new Error("game threw: " + r.err);
+  return r.v;
+}
+const startRun = (rate = 0.25) => run(`(() => { store.set("seenHow", true); UI.startGame(); beginWorld(${rate}); S.countdown = 0; update(0.016); })()`);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function eq(a, b, msg) { if (a !== b) throw new Error(`${msg}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
+function ok(c, msg) { if (!c) throw new Error(msg); }
+
+const tests = [];
+const test = (name, fn) => tests.push({ name, fn });
+
+/* ---------- bugs fixed from the old version ---------- */
+test("Paying off debt takes the money once, not twice", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.wallet = 5000; S.debt = 2000; applyChoice({ payDebt: "max" }); return [S.wallet, S.debt]; })()`);
+  eq(r[0], 3000, "wallet after paying $20 debt"); eq(r[1], 0, "debt left");
+});
+test("Borrowing never hands you free cash", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.wallet = 1000; const b = netWorth(); applyChoice(WORLDS[3].cards[0].c[0].e); return [S.wallet, S.debt, netWorth() - b]; })()`);
+  eq(r[0], 1000, "wallet unchanged by borrowing"); eq(r[1], 2500, "you owe $25"); eq(r[2], -2500, "net worth drops by what you owe");
+});
+test("Moving money (save, invest, sell, pay debt) never creates or destroys money", async () => {
+  await fresh(); startRun();
+  const bad = run(`(() => {
+    const out = [];
+    WORLDS.forEach((wd, wi) => wd.cards.forEach((card, ci) => card.c.forEach((ch, k) => {
+      Object.assign(S, { wallet: 50000, savings: 50000, invest: 10000, debt: 3000, rate: 0, incomeBonus: 0, rebound: false });
+      const e = ch.e, before = netWorth(), invBefore = S.invest;
+      applyChoice(e);
+      const expected = cents(e.wallet || 0) + cents(e.saveIn || 0) - cents(e.debt || 0) + (e.investPct ? Math.round(invBefore * e.investPct) : 0);
+      if (netWorth() - before !== expected) out.push(wi + "." + ci + "." + k + " " + ch.l + ": " + (netWorth() - before) + " vs " + expected);
+    })));
+    return out;
+  })()`);
+  eq(bad.length, 0, "choices whose money doesn't add up: " + bad.join("; "));
+});
+test("Game speed is the same at 60 Hz and 120 Hz", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => {
+    S.gate.done = true; S.ents = []; S.cursor = Infinity; S.mode = "run";
+    const d0 = S.dist; for (let i = 0; i < 60; i++) update(1 / 60);
+    const a = S.dist - d0; S.mode = "run";
+    const d1 = S.dist; for (let i = 0; i < 120; i++) update(1 / 120);
+    return [a, S.dist - d1];
+  })()`);
+  ok(Math.abs(r[0] - r[1]) < 0.01, `distance in 1s: ${r[0]} at 60 Hz vs ${r[1]} at 120 Hz`);
+});
+test("Blocked storage can't crash the game", async () => {
+  await fresh();
+  const r = run(`(() => {
+    Storage.prototype.getItem = () => { throw new Error("blocked"); };
+    Storage.prototype.setItem = () => { throw new Error("blocked"); };
+    UI.buildTitle(); store.set("seenHow", true); UI.startGame(); beginWorld(0.25);
+    S.hearts = 1; S.mode = "run"; endRun("hearts");
+    return [store.get("best", "fallback"), S.mode, !!document.querySelector("#panel .medal")];
+  })()`);
+  eq(r[0], "fallback", "store.get falls back"); eq(r[1], "end", "run still ends"); ok(r[2], "report card still shows");
+});
+test("Collision lanes match the lanes drawn on screen", async () => {
+  await fresh(); startRun();
+  // dividers are painted halfway between lane centers in the theme's cream line color
+  const r = run(`(() => {
+    S.ents = []; S.runner = null; S.dist = 0; Render.draw(0);
+    const c = document.getElementById("stage"), g = c.getContext("2d"), k = G.dpr * G.scale;
+    const hits = y => { const row = g.getImageData(0, Math.round(y * k), c.width, 1).data; let n = 0;
+      for (let i = 0; i < row.length; i += 4) if (row[i] > 245 && row[i + 1] > 235 && row[i + 2] > 205 && row[i + 2] < 230) n++; return n; };
+    return { divider: hits((laneY(0) + laneY(1)) / 2), divider2: hits((laneY(1) + laneY(2)) / 2), center0: hits(laneY(0)), center1: hits(laneY(1)) };
+  })()`);
+  ok(r.divider > 20 && r.divider2 > 20, "divider lines sit between lane centers " + JSON.stringify(r));
+  ok(r.center0 === 0 && r.center1 === 0, "no divider paint on lane centers " + JSON.stringify(r));
+});
+test("Pausing shows a pause panel and freezes the run", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.mode = "run"; togglePause(); const d = S.dist; update(0.5);
+    return [S.mode, document.getElementById("overlay").classList.contains("on"), document.getElementById("panel").textContent.includes("PAUSED"), S.dist === d]; })()`);
+  eq(r[0], "paused", "mode"); ok(r[1] && r[2], "pause panel visible"); ok(r[3], "road froze");
+});
+test("Lanes can't change while paused or during a payday card", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.mode = "run"; S.lane = 1; togglePause(); laneMove(1); const a = S.lane;
+    togglePause(); S.mode = "run"; S.dist = S.stretchStart + STRETCH_LEN; update(0.016); laneMove(-1); return [a, S.mode, S.lane]; })()`);
+  eq(r[0], 1, "lane while paused"); eq(r[1], "payday", "payday opened"); eq(r[2], 1, "lane during payday");
+});
+test("Title screen scrolls on a short screen", async () => {
+  await fresh(390, 420);
+  const r = run(`(() => { const t = document.getElementById("screen-title"); t.scrollTop = 9999;
+    return [getComputedStyle(t).overflowY, t.scrollHeight > t.clientHeight, t.scrollTop > 0]; })()`);
+  eq(r[0], "auto", "overflow"); ok(r[1] && r[2], "content taller than the screen can be scrolled to");
+});
+test("Space after closing a panel jumps instead of re-clicking a hidden button", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.mode = "run"; togglePause(); togglePause(); return document.activeElement === document.body; })()`);
+  ok(r, "focus left the hidden Resume button");
+});
+
+/* ---------- money rules ---------- */
+test("Payday: interest, income, auto-save, and debt interest add up", async () => {
+  await fresh(); startRun(0.25);
+  const r = run(`(() => { Object.assign(S, { wallet: 1000, savings: 10000, rate: 0.03, debt: 2000, stretchCoins: 400, mode: "run", joy: 50 });
+    payday(); return [S.savings, S.wallet, S.debt, S.interestEarned, S.joy]; })()`);
+  // interest 300; income 1000; auto-save 25% of (400 + 1000) = 350
+  eq(r[0], 10000 + 300 + 350, "savings"); eq(r[1], 1000 + 1000 - 350, "wallet"); eq(r[2], 2200, "debt grew 10%");
+  eq(r[3], 300, "interest earned"); eq(r[4], 48, "fun fades 2 joy");
+});
+test("Auto-save never pushes the wallet below zero", async () => {
+  await fresh(); startRun(0.5);
+  const r = run(`(() => { Object.assign(S, { wallet: 0, stretchCoins: 5000, mode: "run" }); payday(); return S.wallet; })()`);
+  ok(r >= 0, "wallet " + r);
+});
+test("Every payday card has a choice you can pick with an empty wallet", async () => {
+  await fresh(); startRun();
+  const bad = run(`(() => { S.wallet = 0; S.savings = 0; const out = [];
+    WORLDS.forEach((wd, wi) => wd.cards.forEach((c, ci) => { if (!c.c.some(ch => canAfford(ch.e))) out.push(wi + "." + ci + " " + c.t); }));
+    return out; })()`);
+  eq(bad.length, 0, "stuck cards: " + bad.join(", "));
+});
+test("Locked choices can't be picked", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.wallet = 0; S.stretch = 2; S.mode = "run"; S.dist = S.stretchStart + STRETCH_LEN; update(0.016); S.wallet = 0;
+    const btns = [...document.querySelectorAll("#panel .choice")];
+    btns.forEach(b => { if (!canAfford(WORLDS[S.world].cards[S.stretch].c[btns.indexOf(b)].e)) b.classList.add("locked"); });
+    const locked = btns.filter(b => b.classList.contains("locked")), before = S.wallet;
+    locked.forEach(b => b.click());
+    return [locked.length, !!document.querySelector("#panel .lesson"), S.wallet === before]; })()`);
+  ok(r[0] >= 1, "at least one locked choice"); ok(!r[1] && r[2], "clicking a locked choice does nothing");
+});
+test("Quiz gate: right lane pays $2, wrong lane pays nothing", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.mode = "run"; S.ents = [S.gate]; S.cursor = Infinity; S.lane = S.gate.okLane;
+    const w0 = S.wallet; S.dist = S.gate.wx; update(0.016); const right = [S.wallet - w0, S.quizRight];
+    S.stretch = 1; beginStretch(0); S.mode = "run"; S.ents = [S.gate]; S.cursor = Infinity; S.lane = (S.gate.okLane + 1) % 3;
+    const w1 = S.wallet; S.dist = S.gate.wx; update(0.016); return [right, [S.wallet - w1, S.quizRight, S.quizTotal]]; })()`);
+  eq(r[0][0], 200, "right answer pays"); eq(r[0][1], 1, "right counted");
+  eq(r[1][0], 0, "wrong answer pays nothing"); eq(r[1][1], 1, "still one right"); eq(r[1][2], 2, "two gates answered");
+});
+test("Emergency-fund shield blocks a trap for free", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.mode = "run"; S.shield = 1; S.wallet = 2000; S.ents = [{ k: "cart", wx: S.dist + 5, lane: S.lane, done: false }]; S.cursor = Infinity; S.gate.done = true;
+    update(0.016); return [S.wallet, S.shield]; })()`);
+  eq(r[0], 2000, "wallet untouched"); eq(r[1], 0, "shield used");
+});
+test("Impulse carts cost more when you carry more cash", async () => {
+  await fresh(); startRun();
+  const hit = wal => run(`(() => { S.mode = "run"; S.invuln = 0; S.shield = 0; S.wallet = ${wal}; S.ents = [{ k: "cart", wx: S.dist + 5, lane: S.lane, done: false }];
+    S.cursor = Infinity; S.gate.done = true; S.jumpT = 0; update(0.016); return ${wal} - S.wallet; })()`);
+  eq(hit(500), 200, "small wallet loses the $2 minimum"); eq(hit(10000), 1200, "big wallet loses 12%");
+});
+test("Jumping clears a cart", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.mode = "run"; S.invuln = 0; S.shield = 0; S.wallet = 1000; S.ents = [{ k: "cart", wx: S.dist + 60, lane: S.lane, done: false }];
+    S.cursor = Infinity; S.gate.done = true; jump(); for (let i = 0; i < 40; i++) update(1 / 60); return [S.wallet, S.trapsHit]; })()`);
+  eq(r[0], 1000, "wallet"); eq(r[1], 0, "no trap hit");
+});
+test("Losing the last heart ends the run with a report card", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.mode = "run"; S.invuln = 0; S.shield = 0; S.hearts = 1; S.ents = [{ k: "scam", wx: S.dist + 5, lane: S.lane, done: false }];
+    S.cursor = Infinity; S.gate.done = true; update(0.016); return [S.mode, S.hearts, !!document.querySelector("#panel .medal")]; })()`);
+  eq(r[0], "end", "mode"); eq(r[1], 0, "hearts"); ok(r[2], "report card shown");
+});
+test("Shop won't sell what you can't afford or don't need", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => { S.wallet = 100; S.hearts = 3; return [buy(SHOP.find(i => i.id === "crown")), buy(SHOP.find(i => i.id === "heart")), S.wallet]; })()`);
+  eq(r[0], false, "crown too expensive"); eq(r[1], false, "hearts already full"); eq(r[2], 100, "wallet unchanged");
+});
+test("A full 4-world run reaches the report card with sane numbers", async () => {
+  await fresh(); startRun();
+  const r = run(`(() => {
+    for (let guard = 0; guard < 500000 && S.mode !== "end"; guard++) {
+      if (S.mode === "payday") { const c = WORLDS[S.world].cards[S.stretch].c.find(x => canAfford(x.e)); applyChoice(c.e); afterLesson(); continue; }
+      if (S.mode === "clear") { if (S.world === WORLDS.length - 1) endRun("done"); else { nextWorld(); beginWorld(0.25); } continue; }
+      if (S.mode === "run" && S.gate && !S.gate.done) S.lane = S.gate.okLane;
+      S.invuln = 1; update(1 / 30);
+    }
+    const nums = ["wallet", "savings", "invest", "debt", "joy", "hearts"].map(k => S[k]);
+    return [S.mode, S.world, S.quizTotal, nums.every(Number.isFinite), S.wallet >= 0 && S.savings >= 0, !!document.querySelector("#panel .medal")];
+  })()`);
+  eq(r[0], "end", "finished"); eq(r[1], 3, "reached world 4"); eq(r[2], 20, "answered 20 gates");
+  ok(r[3] && r[4], "no NaN or negative balances"); ok(r[5], "report card shown");
+});
+test("Content: every card has 3 choices and lessons, quiz answers fit their signs", async () => {
+  await fresh();
+  const bad = run(`(() => { const out = []; const c = document.createElement("canvas").getContext("2d"); c.font = "19px 'Lilita One', sans-serif";
+    WORLDS.forEach((wd, wi) => {
+      if (wd.cards.length !== STRETCHES) out.push(wi + " has " + wd.cards.length + " cards");
+      wd.cards.forEach((cd, ci) => { if (cd.c.length !== 3) out.push(wi + "." + ci + " choices"); cd.c.forEach(ch => { if (!ch.x || !ch.tag) out.push(wi + "." + ci + " missing lesson"); }); });
+      wd.quiz.forEach(q => { if (q.a.length !== 3 || !q.why) out.push(q.q); q.a.forEach(a => { if (c.measureText(a).width > 140) out.push("long answer: " + a); }); });
+      if (wd.quiz.length < STRETCHES) out.push(wi + " needs " + STRETCHES + " quiz questions");
+    }); return out; })()`);
+  eq(bad.length, 0, bad.join("; "));
+});
+
+/* ---------- runner ---------- */
+(async () => {
+  const list = document.getElementById("results");
+  let pass = 0;
+  for (const t of tests) {
+    const li = document.createElement("li");
+    try { await t.fn(); li.className = "pass"; li.textContent = "PASS  " + t.name; pass++; }
+    catch (e) { li.className = "fail"; li.textContent = "FAIL  " + t.name + "  ->  " + e.message; }
+    list.appendChild(li);
+    await wait(20);
+  }
+  const s = document.getElementById("summary");
+  s.textContent = `${pass} of ${tests.length} passed`;
+  s.className = pass === tests.length ? "pass" : "fail";
+  window.testResults = { pass, total: tests.length, done: true };
+})();
+</script>
+</body>
+</html>
